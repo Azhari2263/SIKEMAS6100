@@ -4,10 +4,19 @@
  * * BACKEND LOGIC (Code.gs)
  */
 
-function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
+function doGet(e) {
+  let page = e && e.parameter && e.parameter.page ? e.parameter.page : 'Index';
+  let title = 'SIKEMAS - BPS Prov. Kalbar';
+  let templateName = 'Index';
+  
+  if (page.toLowerCase() === 'monitoring') {
+    templateName = 'monitoring';
+    title = 'Dashboard Monitoring SIKEMAS - BPS Kalbar';
+  }
+  
+  return HtmlService.createTemplateFromFile(templateName)
     .evaluate()
-    .setTitle('SIKEMAS - BPS Prov. Kalbar')
+    .setTitle(title)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
 }
@@ -362,6 +371,21 @@ function doPost(e) {
       case 'getRecords':
         result = getRecords(requestData);
         break;
+      case 'getAllRecords':
+        result = getAllRecords();
+        break;
+      case 'getSpreadsheetUrl':
+        result = { success: true, url: getSpreadsheetUrl() };
+        break;
+      case 'getScriptUrl':
+        result = { success: true, url: getScriptUrl() };
+        break;
+      case 'adminForceCompleteSession':
+        result = adminForceCompleteSession(requestData.sessionId, requestData.nama, requestData.time);
+        break;
+      case 'adminDeleteRecord':
+        result = adminDeleteRecord(requestData.sessionId, requestData.nama);
+        break;
       default:
         result = { success: false, message: "Aksi tidak dikenal: " + action };
     }
@@ -371,4 +395,156 @@ function doPost(e) {
 
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Mengambil semua riwayat dari database untuk Dashboard Monitoring
+function getAllRecords() {
+  try {
+    const sheet = getSheet();
+    const range = sheet.getDataRange();
+    const rows = range.getValues();
+    const displayRows = range.getDisplayValues();
+    
+    if (rows.length <= 1) return { success: true, data: [] };
+    
+    const records = [];
+    for (let i = 1; i < rows.length; i++) {
+      const raw = rows[i];
+      const disp = displayRows[i];
+      
+      let rawDate = raw[2];
+      let formattedDate = rawDate;
+      if (rawDate instanceof Date) {
+        const d = rawDate.getDate().toString().padStart(2, '0');
+        const m = (rawDate.getMonth() + 1).toString().padStart(2, '0');
+        const y = rawDate.getFullYear();
+        formattedDate = `${d}-${m}-${y}`; // Format DD-MM-YYYY
+      } else if (typeof rawDate === 'string' && rawDate.includes('-')) {
+        const cleanDate = rawDate.split('T')[0];
+        const parts = cleanDate.split('-');
+        if (parts.length === 3) {
+          if (parts[0].length === 4) { // YYYY-MM-DD
+            formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+          } else {
+            formattedDate = cleanDate;
+          }
+        }
+      }
+      
+      const waktuKeluar = String(disp[3] || "-").trim();
+      const waktuKembali = String(disp[4] || "-").trim();
+      
+      let durasiMenit = null;
+      let durasiTeks = "-";
+      if (waktuKeluar !== "-" && waktuKembali !== "-") {
+        durasiMenit = hitungDurasiMenit(waktuKeluar, waktuKembali);
+        if (durasiMenit !== null) {
+          durasiTeks = formatDurasi(durasiMenit);
+        }
+      } else if (waktuKeluar !== "-" && waktuKembali === "-") {
+        durasiTeks = "Sedang Keluar";
+      }
+      
+      records.push({
+        nama: String(raw[0] || "-"),
+        hari: String(raw[1] || "-"),
+        tanggal: String(formattedDate || "-"),
+        waktuKeluar: waktuKeluar,
+        waktuKembali: waktuKembali,
+        keterangan: String(raw[5] || "-"),
+        timestamp: raw[6] ? new Date(raw[6]).toISOString() : "",
+        sessionId: raw.length > 7 ? String(raw[7] || "") : "",
+        durasiMenit: durasiMenit,
+        durasiTeks: durasiTeks
+      });
+    }
+    
+    // Urutkan berdasarkan timestamp descending
+    records.sort((a, b) => {
+      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return timeB - timeA;
+    });
+    
+    return { success: true, data: records };
+  } catch (error) {
+    Logger.log("Error getAllRecords: " + error.toString());
+    return { success: false, message: error.toString(), data: [] };
+  }
+}
+
+// Helper hitung durasi dalam menit
+function hitungDurasiMenit(keluar, kembali) {
+  try {
+    const kParts = keluar.split(':');
+    const bParts = kembali.split(':');
+    if (kParts.length >= 2 && bParts.length >= 2) {
+      const kMin = parseInt(kParts[0], 10) * 60 + parseInt(kParts[1], 10);
+      const bMin = parseInt(bParts[0], 10) * 60 + parseInt(bParts[1], 10);
+      let diff = bMin - kMin;
+      if (diff < 0) diff += 24 * 60; // handling lewat tengah malam
+      return diff;
+    }
+  } catch(e) {}
+  return null;
+}
+
+// Helper format durasi ke teks jam/menit
+function formatDurasi(menit) {
+  if (menit === null || menit < 0) return "-";
+  const jam = Math.floor(menit / 60);
+  const sisaMenit = menit % 60;
+  if (jam > 0) {
+    return `${jam} jam ${sisaMenit} menit`;
+  }
+  return `${sisaMenit} menit`;
+}
+
+// Mengambil URL spreadsheet aktif secara dinamis
+function getSpreadsheetUrl() {
+  try {
+    return SpreadsheetApp.getActiveSpreadsheet().getUrl();
+  } catch (e) {
+    const properties = PropertiesService.getScriptProperties();
+    let sheetId = properties.getProperty("SPREADSHEET_ID");
+    if (sheetId) {
+      return "https://docs.google.com/spreadsheets/d/" + sheetId + "/edit";
+    }
+  }
+  return "#";
+}
+
+// Mengambil URL script web app secara dinamis
+function getScriptUrl() {
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (e) {
+    return "";
+  }
+}
+
+// Admin menyelesaikan sesi secara paksa
+function adminForceCompleteSession(sessionId, employeeName, kembaliTime) {
+  try {
+    const sheet = getSheet();
+    const rowIndex = findRowBySessionOrEmployee(sessionId, employeeName);
+    
+    if (!rowIndex) {
+      return { success: false, message: "Sesi aktif tidak ditemukan di database." };
+    }
+    
+    sheet.getRange(rowIndex, 5).setValue("'" + kembaliTime); // Waktu Kembali (Kolom E)
+    return { success: true, message: `Sesi ${employeeName} berhasil diselesaikan pada pukul ${kembaliTime}.` };
+  } catch (error) {
+    return { success: false, message: "Gagal menyelesaikan sesi: " + error.toString() };
+  }
+}
+
+// Admin menghapus log secara paksa
+function adminDeleteRecord(sessionId, employeeName) {
+  try {
+    return deleteRecordSafe(sessionId, employeeName);
+  } catch (error) {
+    return { success: false, message: "Gagal menghapus log: " + error.toString() };
+  }
 }

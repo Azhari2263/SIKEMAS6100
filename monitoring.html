@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIKEMAS - Dashboard Monitoring</title>
+    <!-- Google Fonts & Tailwind CSS & FontAwesome Icons & ChartJS & SheetJS -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bpsBlue: '#005aa9',
+                        bpsOrange: '#f29400',
+                        slateBg: '#f8fafc',
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.35s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-overlay {
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            transform: scale(0.95);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-overlay.active .modal-card {
+            transform: scale(1);
+        }
+
+        .sidebar-transition {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Table scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body class="bg-slateBg text-slate-800 min-h-screen sidebar-transition">
+
+    <!-- Loading Spinner Overlay -->
+    <div id="loader"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[9999]">
+        <div class="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center gap-3 border border-slate-100 max-w-[200px] w-full text-center">
+            <div class="w-10 h-10 border-4 border-slate-100 border-t-bpsBlue rounded-full animate-spin"></div>
+            <p class="text-xs font-bold text-slate-700 mt-1">Memproses data...</p>
+        </div>
+    </div>
+
+    <!-- Custom Alert Pop Up Modal -->
+    <div id="custom-alert"
+        class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-[3px] flex items-center justify-center p-4 z-[999]">
+        <div class="modal-card bg-white w-full max-w-[360px] rounded-2xl p-6 shadow-2xl border border-slate-100 text-center">
+            <div id="modal-icon" class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+            </div>
+            <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-1">Pemberitahuan</h3>
+            <p id="modal-message" class="text-sm text-slate-500 leading-relaxed mb-5"></p>
+            <button
+                class="w-full bg-bpsBlue text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-bpsBlue/20 hover:bg-opacity-90 active:scale-[0.98] transition-all text-sm"
+                onclick="closeCustomAlert()">OK</button>
+        </div>
+    </div>
+
+    <!-- Admin Force Complete Modal -->
+    <div id="modal-force-complete"
+        class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-[3px] flex items-center justify-center p-4 z-[999]">
+        <div class="modal-card bg-white w-full max-w-[380px] rounded-2xl p-6 shadow-2xl border border-slate-100">
+            <div class="flex items-center gap-3 border-b border-slate-100 pb-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 text-bpsBlue flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Selesaikan Sesi</h3>
+                    <p class="text-[10px] text-slate-400 font-medium">Input Waktu Kembali Pegawai</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Pegawai</label>
+                    <input id="fc-nama" type="text" readonly class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Waktu Keluar</label>
+                    <input id="fc-keluar" type="text" readonly class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-bpsBlue uppercase tracking-wider mb-1.5">Jam Kembali (HH:MM)</label>
+                    <input id="fc-kembali" type="time" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-bpsBlue focus:ring-1 focus:ring-bpsBlue bg-white cursor-pointer" />
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button
+                    class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 px-4 rounded-xl hover:bg-slate-200 transition-all text-xs"
+                    onclick="closeForceCompleteModal()">Batal</button>
+                <button
+                    class="flex-1 bg-bpsBlue text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-bpsBlue/20 hover:bg-opacity-95 transition-all text-xs"
+                    onclick="submitForceComplete()">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Dialog Modal -->
+    <div id="custom-confirm"
+        class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-[3px] flex items-center justify-center p-4 z-[999]">
+        <div class="modal-card bg-white w-full max-w-[360px] rounded-2xl p-6 shadow-2xl border border-slate-100 text-center">
+            <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl bg-rose-50 text-rose-500">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Konfirmasi</h3>
+            <p id="confirm-message" class="text-sm text-slate-500 leading-relaxed mb-5"></p>
+            <div class="flex gap-3">
+                <button
+                    class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 px-4 rounded-xl hover:bg-slate-200 transition-all text-xs"
+                    onclick="closeCustomConfirm()">Batal</button>
+                <button id="btn-confirm-action"
+                    class="flex-1 bg-rose-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all text-xs">
+                    Ya, Proses
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div class="min-h-screen flex bg-slateBg w-full">
+
+        <!-- LEFT SIDEBAR -->
+        <aside id="sidebar" class="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 z-40 bg-white border-r border-slate-100 sidebar-transition w-64">
+            <!-- Sidebar Header -->
+            <div class="h-16 flex items-center justify-between px-6 border-b border-slate-50">
+                <div class="flex items-center gap-3 logo-container sidebar-transition">
+                    <div class="w-8 h-8 rounded-xl bg-bpsBlue flex-shrink-0 flex items-center justify-center text-white shadow-md shadow-bpsBlue/20">
+                        <i class="fa-solid fa-chart-pie text-sm"></i>
+                    </div>
+                    <span class="font-extrabold text-base text-slate-800 tracking-wider">SIKEMAS</span>
+                </div>
+                <!-- Collapse Button -->
+                <button onclick="toggleSidebar()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-bpsBlue hover:bg-slate-50 transition-all">
+                    <i id="sidebar-toggle-icon" class="fa-solid fa-chevron-left"></i>
+                </button>
+            </div>
+
+            <!-- Sidebar Navigation -->
+            <nav class="flex-1 px-4 py-6 space-y-1.5">
+                <button id="sidebar-nav-dashboard" onclick="switchTab('dashboard', this)"
+                    class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-bpsBlue bg-blue-50/50">
+                    <i class="fa-solid fa-gauge text-lg"></i>
+                    <span class="nav-text sidebar-transition">Dashboard</span>
+                </button>
+                <button id="sidebar-nav-chart" onclick="switchTab('chart', this)"
+                    class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-slate-400 hover:text-slate-700 hover:bg-slate-50/50">
+                    <i class="fa-solid fa-chart-line text-lg"></i>
+                    <span class="nav-text sidebar-transition">Distribusi Keluar</span>
+                </button>
+                <button id="sidebar-nav-detail" onclick="switchTab('detail', this)"
+                    class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-slate-400 hover:text-slate-700 hover:bg-slate-50/50">
+                    <i class="fa-solid fa-list-check text-lg"></i>
+                    <span class="nav-text sidebar-transition">Detail Hari Ini</span>
+                </button>
+                <button id="sidebar-nav-riwayat" onclick="switchTab('riwayat', this)"
+                    class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-slate-400 hover:text-slate-700 hover:bg-slate-50/50">
+                    <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+                    <span class="nav-text sidebar-transition">Riwayat Log</span>
+                </button>
+                <button id="sidebar-nav-manage" onclick="switchTab('manage', this)"
+                    class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-slate-400 hover:text-slate-700 hover:bg-slate-50/50">
+                    <i class="fa-solid fa-sliders text-lg"></i>
+                    <span class="nav-text sidebar-transition">Pengelolaan Sesi</span>
+                </button>
+            </nav>
+
+            <!-- Sidebar Footer -->
+            <div class="p-6 border-t border-slate-50 text-[9px] text-slate-400 font-semibold uppercase tracking-wider space-y-1 logo-container sidebar-transition">
+                <p>© 2026 Umum & Humas</p>
+                <p>BPS Prov. Kalbar</p>
+            </div>
+        </aside>
+
+        <!-- RIGHT MAIN WRAPPER -->
+        <div id="main-wrapper" class="flex-1 flex flex-col min-h-screen sidebar-transition lg:pl-64 w-full">
+
+            <!-- TOP HEADER -->
+            <header class="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm shadow-slate-100/30">
+                <!-- Mobile Brand -->
+                <div class="flex items-center gap-3 lg:hidden">
+                    <div class="w-8 h-8 rounded-xl bg-bpsBlue flex-shrink-0 flex items-center justify-center text-white shadow-md shadow-bpsBlue/20">
+                        <i class="fa-solid fa-chart-pie text-sm"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-base text-slate-800 tracking-wider">SIKEMAS</h1>
+                        <p class="text-[9px] text-slate-400 font-medium -mt-0.5">Dashboard Monitoring</p>
+                    </div>
+                </div>
+
+                <!-- Desktop Title -->
+                <div class="hidden lg:block">
+                    <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider">SIKEMAS - Dashboard Monitoring</h2>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-0.5">BPS Provinsi Kalimantan Barat</p>
+                </div>
+
+                <!-- Live Clock, Refresh Controls, spreadsheet link -->
+                <div class="flex items-center gap-3.5 sm:gap-4">
+                    <button onclick="reloadData()" title="Refresh Data"
+                        class="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-bpsBlue hover:bg-blue-50 transition-all">
+                        <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                    </button>
+                    <div class="text-right hidden sm:block">
+                        <p id="live-time" class="text-xs font-bold text-slate-700">00:00:00</p>
+                        <p id="live-date" class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Memuat...</p>
+                    </div>
+                    <div class="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-bpsBlue font-bold text-sm border border-slate-100 shadow-sm">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- MAIN CONTENT AREA -->
+            <main class="p-4 md:p-6 lg:p-8 max-w-[1200px] w-full mx-auto flex-1">
+
+                <!-- ================= TAB A: DASHBOARD ================= -->
+                <div id="tab-dashboard" class="tab-content active">
+                    <div class="space-y-6">
+                        <!-- Heading -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Ringkasan Statistik Hari Ini</h1>
+                                <p class="text-xs text-slate-400 font-medium">Statistik real-time log keluar-masuk pegawai per hari ini</p>
+                            </div>
+                            <div class="flex items-center gap-2 bg-white px-4 py-2 border border-slate-100 rounded-2xl shadow-sm text-xs font-bold text-slate-600">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                                Live Sync Aktif
+                            </div>
+                        </div>
+
+                        <!-- STAT CARDS GRID -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <!-- Card 1: Terdaftar -->
+                            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+                                <div class="space-y-1">
+                                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Terdaftar</p>
+                                    <h3 id="stat-terdaftar" class="text-2xl font-extrabold text-slate-800">0</h3>
+                                    <p class="text-[10px] text-slate-400 font-medium">Kegiatan hari ini</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-blue-50 text-bpsBlue flex items-center justify-center text-xl shadow-inner">
+                                    <i class="fa-solid fa-address-book"></i>
+                                </div>
+                            </div>
+                            <!-- Card 2: Sedang Keluar -->
+                            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+                                <div class="space-y-1">
+                                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sedang Keluar</p>
+                                    <h3 id="stat-keluar" class="text-2xl font-extrabold text-amber-500">0</h3>
+                                    <p class="text-[10px] text-slate-400 font-medium">Pegawai di luar kantor</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl shadow-inner">
+                                    <i class="fa-solid fa-person-walking-arrow-right"></i>
+                                </div>
+                            </div>
+                            <!-- Card 3: Selesai -->
+                            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+                                <div class="space-y-1">
+                                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sudah Kembali</p>
+                                    <h3 id="stat-kembali" class="text-2xl font-extrabold text-emerald-500">0</h3>
+                                    <p class="text-[10px] text-slate-400 font-medium">Sesi selesai</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl shadow-inner">
+                                    <i class="fa-solid fa-person-circle-check"></i>
+                                </div>
+                            </div>
+                            <!-- Card 4: Belum Keluar -->
+                            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+                                <div class="space-y-1">
+                                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Menunggu Keluar</p>
+                                    <h3 id="stat-menunggu" class="text-2xl font-extrabold text-slate-400">0</h3>
+                                    <p class="text-[10px] text-slate-400 font-medium">Sudah isi rencana</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center text-xl shadow-inner">
+                                    <i class="fa-solid fa-hourglass-start"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- STATS SUB CONTAINER: Live Outings & Shortcuts -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <!-- Left: List of active outings today -->
+                            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 lg:col-span-2 space-y-4">
+                                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                                        Pegawai Sedang Keluar Saat Ini
+                                    </h3>
+                                    <span id="active-outings-count" class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg">0 Orang</span>
+                                </div>
+                                <div class="overflow-x-auto custom-scrollbar">
+                                    <table class="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr class="border-b border-slate-50 text-slate-400 font-bold">
+                                                <th class="py-3 px-4">NAMA</th>
+                                                <th class="py-3 px-4">JAM KELUAR</th>
+                                                <th class="py-3 px-4">DURASI</th>
+                                                <th class="py-3 px-4">KEPERLUAN</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="active-outings-tbody" class="divide-y divide-slate-50 font-medium text-slate-700">
+                                            <tr>
+                                                <td colspan="4" class="py-6 text-center text-slate-400">Tidak ada pegawai yang sedang keluar saat ini.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Right: Quick Settings / System Status -->
+                            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+                                <div class="border-b border-slate-100 pb-3">
+                                    <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-toolbox text-slate-400 mr-1.5"></i>Pengelolaan Cepat</h3>
+                                </div>
+                                <div class="space-y-3.5">
+                                    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                        <div>
+                                            <p class="text-xs font-bold text-slate-800">Auto Refresh</p>
+                                            <p class="text-[10px] text-slate-400">Interval pembaruan 30 detik</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="auto-refresh-toggle" checked class="sr-only peer">
+                                            <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-bpsBlue"></div>
+                                        </label>
+                                    </div>
+                                    <button onclick="switchTab('manage', document.getElementById('sidebar-nav-manage'))"
+                                        class="w-full flex items-center justify-between p-3 rounded-xl bg-blue-50/50 hover:bg-blue-50 border border-blue-100/50 text-bpsBlue font-bold text-xs transition-all">
+                                        <span>Kelola Sesi Aktif</span>
+                                        <i class="fa-solid fa-arrow-right"></i>
+                                    </button>
+                                    <a id="db-sheet-link-dash" href="#" target="_blank"
+                                        class="w-full flex items-center justify-between p-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-600 font-bold text-xs transition-all">
+                                        <span>Buka Google Spreadsheet Database</span>
+                                        <i class="fa-solid fa-up-right-from-square"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB B: DISTRIBUSI KELUAR ================= -->
+                <div id="tab-chart" class="tab-content">
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 lg:p-6 space-y-6">
+                        <!-- Chart Header and Filters -->
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                            <div>
+                                <h1 class="text-base font-extrabold text-slate-900 tracking-tight">Grafik Distribusi Keluar Pegawai</h1>
+                                <p class="text-xs text-slate-400 font-medium">Tren grafik kumulatif dan frekuensi harian keluar pegawai per bulan</p>
+                            </div>
+                            <!-- Filters -->
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                                    <label for="filter-chart-bulan" class="text-[10px] font-bold text-slate-400 uppercase">Bulan</label>
+                                    <select id="filter-chart-bulan" onchange="renderChartData()"
+                                        class="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                                        <option value="1">Januari</option>
+                                        <option value="2">Februari</option>
+                                        <option value="3">Maret</option>
+                                        <option value="4">April</option>
+                                        <option value="5">Mei</option>
+                                        <option value="6">Juni</option>
+                                        <option value="7">Juli</option>
+                                        <option value="8">Agustus</option>
+                                        <option value="9">September</option>
+                                        <option value="10">Oktober</option>
+                                        <option value="11">November</option>
+                                        <option value="12">Desember</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                                    <label for="filter-chart-tahun" class="text-[10px] font-bold text-slate-400 uppercase">Tahun</label>
+                                    <select id="filter-chart-tahun" onchange="renderChartData()"
+                                        class="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026" selected>2026</option>
+                                        <option value="2027">2027</option>
+                                        <option value="2028">2028</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chart Canvas Container -->
+                        <div class="relative w-full h-[300px] md:h-[400px]">
+                            <canvas id="outingsChart"></canvas>
+                        </div>
+                        
+                        <div class="p-4 rounded-xl bg-blue-50/50 border border-blue-100 flex items-start gap-3">
+                            <i class="fa-solid fa-circle-info text-bpsBlue mt-0.5 text-sm"></i>
+                            <div class="text-xs text-slate-600 leading-relaxed">
+                                <span class="font-bold text-slate-700">Tentang Grafik:</span> Grafik di atas menampilkan dua data visual sekaligus: batang berwarna jingga (frekuensi harian pegawai yang keluar) dan kurva garis biru (jumlah kumulatif pegawai keluar) sepanjang hari-hari pada bulan yang bersangkutan. Grafik akan otomatis memperbarui tampilan saat filter bulan dan tahun diubah.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB C: DETAIL HARI INI ================= -->
+                <div id="tab-detail" class="tab-content">
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 lg:p-6 space-y-4">
+                        <!-- Header & Search -->
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                            <div>
+                                <h1 class="text-base font-extrabold text-slate-900 tracking-tight">Daftar Detail Pegawai Keluar Hari Ini</h1>
+                                <p class="text-xs text-slate-400 font-medium">Log detail keluar masuk pegawai pada tanggal hari berjalan</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="relative w-full md:w-60">
+                                    <i class="fa-solid fa-magnifying-glass text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-xs"></i>
+                                    <input type="text" id="search-today" oninput="filterTodayData()" placeholder="Cari nama pegawai..."
+                                        class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-bpsBlue transition-all" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Today Detail Table -->
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left border-collapse text-xs min-w-[700px]">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-slate-400 font-bold bg-slate-50/50">
+                                        <th class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-all rounded-l-xl" onclick="toggleSortToday('nama')">
+                                            NAMA PEGAWAI <i id="sort-icon-today-nama" class="fa-solid fa-sort ml-1 text-[10px]"></i>
+                                        </th>
+                                        <th class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-all" onclick="toggleSortToday('waktuKeluar')">
+                                            JAM KELUAR <i id="sort-icon-today-waktuKeluar" class="fa-solid fa-sort ml-1 text-[10px]"></i>
+                                        </th>
+                                        <th class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-all" onclick="toggleSortToday('waktuKembali')">
+                                            JAM KEMBALI <i id="sort-icon-today-waktuKembali" class="fa-solid fa-sort ml-1 text-[10px]"></i>
+                                        </th>
+                                        <th class="py-3 px-4">DURASI</th>
+                                        <th class="py-3 px-4 rounded-r-xl">KETERANGAN KEPERLUAN</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="today-tbody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                                    <!-- Table contents will be dynamically rendered -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500">
+                            <span id="today-page-info">Menampilkan 0 - 0 dari 0 data</span>
+                            <div class="flex gap-2">
+                                <button onclick="prevTodayPage()" id="btn-today-prev" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Sebelumnya</button>
+                                <button onclick="nextTodayPage()" id="btn-today-next" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Selanjutnya</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB D: RIWAYAT LOG ================= -->
+                <div id="tab-riwayat" class="tab-content">
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 lg:p-6 space-y-4">
+                        <!-- Header & Actions -->
+                        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                            <div>
+                                <h1 class="text-base font-extrabold text-slate-900 tracking-tight">Riwayat Keluar Masuk Pegawai</h1>
+                                <p class="text-xs text-slate-400 font-medium">Seluruh log aktivitas keluar masuk pegawai yang terdaftar di database</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button onclick="exportToExcel()" class="flex items-center gap-2 bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm">
+                                    <i class="fa-solid fa-file-excel"></i>
+                                    <span>Export Excel</span>
+                                </button>
+                                <a id="db-sheet-link-riwayat" href="#" target="_blank" class="flex items-center gap-2 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm">
+                                    <i class="fa-solid fa-up-right-from-square"></i>
+                                    <span>Database Sheet</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Comprehensive Filters Panel -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                            <!-- Search -->
+                            <div class="space-y-1">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Pegawai</label>
+                                <input type="text" id="filter-riwayat-nama" oninput="applyFiltersRiwayat()" placeholder="Cari nama..."
+                                    class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-bpsBlue bg-white" />
+                            </div>
+                            <!-- Date filter -->
+                            <div class="space-y-1">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal Spesifik</label>
+                                <input type="date" id="filter-riwayat-tanggal" onchange="applyFiltersRiwayat()"
+                                    class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-bpsBlue bg-white cursor-pointer" />
+                            </div>
+                            <!-- Month filter -->
+                            <div class="space-y-1">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bulan</label>
+                                <select id="filter-riwayat-bulan" onchange="applyFiltersRiwayat()"
+                                    class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-bpsBlue bg-white cursor-pointer font-semibold text-slate-700">
+                                    <option value="">Semua Bulan</option>
+                                    <option value="1">Januari</option>
+                                    <option value="2">Februari</option>
+                                    <option value="3">Maret</option>
+                                    <option value="4">April</option>
+                                    <option value="5">Mei</option>
+                                    <option value="6">Juni</option>
+                                    <option value="7">Juli</option>
+                                    <option value="8">Agustus</option>
+                                    <option value="9">September</option>
+                                    <option value="10">Oktober</option>
+                                    <option value="11">November</option>
+                                    <option value="12">Desember</option>
+                                </select>
+                            </div>
+                            <!-- Year filter -->
+                            <div class="space-y-1">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tahun</label>
+                                <select id="filter-riwayat-tahun" onchange="applyFiltersRiwayat()"
+                                    class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-bpsBlue bg-white cursor-pointer font-semibold text-slate-700">
+                                    <option value="">Semua Tahun</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2027">2027</option>
+                                    <option value="2028">2028</option>
+                                </select>
+                            </div>
+                            <!-- Status filter -->
+                            <div class="space-y-1">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</label>
+                                <select id="filter-riwayat-status" onchange="applyFiltersRiwayat()"
+                                    class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-bpsBlue bg-white cursor-pointer font-semibold text-slate-700">
+                                    <option value="">Semua Status</option>
+                                    <option value="Sedang Keluar">Sedang Keluar</option>
+                                    <option value="Selesai">Selesai (Sudah Kembali)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- History Table -->
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left border-collapse text-xs min-w-[800px]">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-slate-400 font-bold bg-slate-50/50">
+                                        <th class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-all rounded-l-xl" onclick="toggleSortRiwayat('nama')">
+                                            NAMA <i id="sort-icon-riwayat-nama" class="fa-solid fa-sort ml-1 text-[10px]"></i>
+                                        </th>
+                                        <th class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-all" onclick="toggleSortRiwayat('tanggal')">
+                                            TANGGAL <i id="sort-icon-riwayat-tanggal" class="fa-solid fa-sort ml-1 text-[10px]"></i>
+                                        </th>
+                                        <th class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-all" onclick="toggleSortRiwayat('waktuKeluar')">
+                                            JAM KELUAR <i id="sort-icon-riwayat-waktuKeluar" class="fa-solid fa-sort ml-1 text-[10px]"></i>
+                                        </th>
+                                        <th class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-all" onclick="toggleSortRiwayat('waktuKembali')">
+                                            JAM KEMBALI <i id="sort-icon-riwayat-waktuKembali" class="fa-solid fa-sort ml-1 text-[10px]"></i>
+                                        </th>
+                                        <th class="py-3 px-4">DURASI</th>
+                                        <th class="py-3 px-4">KETERANGAN KEPERLUAN</th>
+                                        <th class="py-3 px-4 rounded-r-xl">STATUS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="riwayat-tbody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                                    <!-- Table contents dynamically rendered -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination controls -->
+                        <div class="flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500">
+                            <span id="riwayat-page-info">Menampilkan 0 - 0 dari 0 data</span>
+                            <div class="flex gap-2">
+                                <button onclick="prevRiwayatPage()" id="btn-riwayat-prev" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Sebelumnya</button>
+                                <button onclick="nextRiwayatPage()" id="btn-riwayat-next" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Selanjutnya</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB E: PENGELOLAAN SESI ================= -->
+                <div id="tab-manage" class="tab-content">
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 lg:p-6 space-y-4">
+                        <div class="border-b border-slate-100 pb-3.5">
+                            <h1 class="text-base font-extrabold text-slate-900 tracking-tight">Menu Pengelolaan Sesi</h1>
+                            <p class="text-xs text-slate-400 font-medium">Panel khusus administrator untuk menyelesaikan atau membatalkan sesi keluar-masuk secara langsung.</p>
+                        </div>
+
+                        <!-- Active Outings List for Admin -->
+                        <div class="space-y-4">
+                            <div class="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-bpsBlue leading-relaxed flex items-start gap-2.5">
+                                <i class="fa-solid fa-circle-exclamation text-base mt-0.5"></i>
+                                <div>
+                                    <span class="font-bold">Tips Pengelolaan:</span> Jika pegawai lupa menekan tombol **Jam Kembali** pada aplikasi SIKEMAS, administrator dapat menekan tombol **Selesaikan Sesi** di bawah ini untuk menginputkan jam kembali secara manual. Gunakan tombol **Hapus** untuk menghapus log dari database jika terjadi kesalahan entri.
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto custom-scrollbar">
+                                <table class="w-full text-left border-collapse text-xs min-w-[700px]">
+                                    <thead>
+                                        <tr class="border-b border-slate-100 text-slate-400 font-bold bg-slate-50/50">
+                                            <th class="py-3 px-4 rounded-l-xl">NAMA PEGAWAI</th>
+                                            <th class="py-3 px-4">TANGGAL</th>
+                                            <th class="py-3 px-4">JAM KELUAR</th>
+                                            <th class="py-3 px-4">KETERANGAN KEPERLUAN</th>
+                                            <th class="py-3 px-4 text-center rounded-r-xl" style="width: 180px;">AKSI</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="manage-tbody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                                        <!-- Table contents dynamically rendered -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Live clock script & API calls -->
+    <script>
+        // Endpoint URL fallback jika dijalankan lokal
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyv-BnYEzLO41NkhkG9kRxuZQ_AzgbF51hamfACEbokj4WTdWhicwPsR5wrJ2Xa3W4Z/exec";
+
+        // Global dataset records
+        let allRecords = [];
+        let spreadsheetUrl = "#";
+
+        // Auto Refresh Interval ID
+        let autoRefreshInterval = null;
+
+        // Custom Confirm and Modal Session ID refs
+        let activeConfirmCallback = null;
+        let activeManageSessionId = "";
+        let activeManageEmployeeName = "";
+        let activeManageOutTime = "";
+
+        // Today detail pagination state
+        let todayData = [];
+        let todayPage = 1;
+        const todayPageSize = 10;
+        let todaySortField = 'waktuKeluar';
+        let todaySortOrder = 'desc'; // 'asc' or 'desc'
+
+        // History pagination state
+        let filteredRiwayatData = [];
+        let riwayatPage = 1;
+        const riwayatPageSize = 10;
+        let riwayatSortField = 'timestamp';
+        let riwayatSortOrder = 'desc';
+
+        // Chart Instance global pointer
+        let outingsChartInstance = null;
+
+        // ================= API CALL WRAPPER =================
+        async function callAppsScript(action, data = {}) {
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                return new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(error => {
+                            console.error(`Apps Script error on ${action}:`, error);
+                            reject(error);
+                        })
+                        [action](data);
+                });
+            }
+            
+            try {
+                const payload = { action: action, ...data };
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error calling Apps Script:', error);
+                throw error;
+            }
+        }
+
+        // ================= PAGE INITIALIZATION =================
+        window.onload = function() {
+            startLiveClock();
+            loadSheetUrl();
+            reloadData(true); // Load data initially
+
+            // Setup Auto Refresh toggling
+            const toggle = document.getElementById('auto-refresh-toggle');
+            if (toggle) {
+                toggle.addEventListener('change', function() {
+                    toggleAutoRefresh(this.checked);
+                });
+                toggleAutoRefresh(toggle.checked);
+            }
+
+            // Start live refresh for durations in active outings table
+            setInterval(updateLiveDurations, 60000); // refresh durations every 1 minute
+        }
+
+        // Clock & Date Logic
+        function startLiveClock() {
+            const hariNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+            const bulanNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            
+            function updateClock() {
+                const now = new Date();
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                const seconds = now.getSeconds().toString().padStart(2, '0');
+                
+                const timeEl = document.getElementById('live-time');
+                if (timeEl) timeEl.textContent = `${hours}:${minutes}:${seconds}`;
+                
+                const dateEl = document.getElementById('live-date');
+                if (dateEl) {
+                    const hari = hariNames[now.getDay()];
+                    const tgl = now.getDate();
+                    const bln = bulanNames[now.getMonth()];
+                    const thn = now.getFullYear();
+                    dateEl.textContent = `${hari}, ${tgl} ${bln} ${thn}`;
+                }
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        // Load spreadsheet URL dynamically
+        async function loadSheetUrl() {
+            try {
+                const res = await callAppsScript('getSpreadsheetUrl');
+                if (res && res.success && res.url) {
+                    spreadsheetUrl = res.url;
+                    
+                    const elDash = document.getElementById('db-sheet-link-dash');
+                    const elRiw = document.getElementById('db-sheet-link-riwayat');
+                    if (elDash) elDash.href = spreadsheetUrl;
+                    if (elRiw) elRiw.href = spreadsheetUrl;
+                }
+            } catch(e) {
+                console.error("Gagal memuat URL database:", e);
+            }
+        }
+
+        // Reload data from backend database
+        async function reloadData(showLoading = false) {
+            if (showLoading) showLoader(true);
+            try {
+                const res = await callAppsScript('getAllRecords');
+                if (res && res.success && res.data) {
+                    allRecords = res.data;
+                    processDashboardData();
+                    renderChartData();
+                    filterTodayData();
+                    applyFiltersRiwayat();
+                    renderManageData();
+                } else {
+                    showCustomAlert("Gagal", "Gagal memuat data dari database.", "error");
+                }
+            } catch (error) {
+                console.error("Error loading records:", error);
+                showCustomAlert("Koneksi Error", "Terjadi kesalahan saat memuat data: " + error.toString(), "error");
+            } finally {
+                if (showLoading) showLoader(false);
+            }
+        }
+
+        // Auto Refresh Toggle Logic
+        function toggleAutoRefresh(enable) {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            if (enable) {
+                autoRefreshInterval = setInterval(function() {
+                    reloadData(false); // reload silently
+                }, 30000); // 30 seconds
+            }
+        }
+
+        // Live refresh durations
+        function updateLiveDurations() {
+            // Update active outings table live duration badges
+            const rows = document.querySelectorAll('.live-duration-badge');
+            rows.forEach(badge => {
+                const waktuKeluar = badge.getAttribute('data-keluar');
+                if (waktuKeluar) {
+                    const durText = calculateLiveDurationText(waktuKeluar);
+                    badge.innerHTML = `<i class="fa-solid fa-spinner animate-spin text-[10px]"></i> ${durText} (Sedang Keluar)`;
+                }
+            });
+        }
+
+        // Loader Toggle Helper
+        function showLoader(show) {
+            const loader = document.getElementById('loader');
+            if (loader) {
+                if (show) loader.classList.remove('hidden');
+                else loader.classList.add('hidden');
+            }
+        }
+
+        // ================= DASHBOARD LOGIC (A) =================
+        function processDashboardData() {
+            // Get today date in DD-MM-YYYY format
+            const todayStr = getTodayDateString();
+            
+            // Filter records for today
+            const todayRecords = allRecords.filter(r => r.tanggal === todayStr);
+
+            // Stats
+            const totalTerdaftar = todayRecords.length;
+            const sedangKeluar = todayRecords.filter(r => r.waktuKeluar !== "-" && r.waktuKembali === "-").length;
+            const sudahKembali = todayRecords.filter(r => r.waktuKeluar !== "-" && r.waktuKembali !== "-").length;
+            const menungguKeluar = todayRecords.filter(r => r.waktuKeluar === "-").length;
+
+            document.getElementById('stat-terdaftar').textContent = totalTerdaftar;
+            document.getElementById('stat-keluar').textContent = sedangKeluar;
+            document.getElementById('stat-kembali').textContent = sudahKembali;
+            document.getElementById('stat-menunggu').textContent = menungguKeluar;
+
+            // Fill active outings list table
+            const tbody = document.getElementById('active-outings-tbody');
+            tbody.innerHTML = '';
+
+            const activeOutings = todayRecords.filter(r => r.waktuKeluar !== "-" && r.waktuKembali === "-");
+            document.getElementById('active-outings-count').textContent = `${activeOutings.length} Orang`;
+
+            if (activeOutings.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-400">Tidak ada pegawai yang sedang keluar saat ini.</td></tr>`;
+            } else {
+                activeOutings.forEach(item => {
+                    const durationText = calculateLiveDurationText(item.waktuKeluar);
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/50 transition-all";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-bold text-slate-800">${item.nama}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-600">${item.waktuKeluar}</td>
+                        <td class="py-3 px-4">
+                            <span class="live-duration-badge inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100 animate-pulse" 
+                                data-keluar="${item.waktuKeluar}">
+                                <i class="fa-solid fa-spinner animate-spin text-[10px]"></i> ${durationText} (Sedang Keluar)
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-slate-500 max-w-[200px] truncate" title="${item.keterangan}">${item.keterangan}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        // ================= CHART LOGIC (B) =================
+        function renderChartData() {
+            const bulan = parseInt(document.getElementById('filter-chart-bulan').value, 10);
+            const tahun = parseInt(document.getElementById('filter-chart-tahun').value, 10);
+
+            // Days in selected month
+            const daysInMonth = new Date(tahun, bulan, 0).getDate();
+            const labels = [];
+            const dailyCounts = [];
+            const cumulativeCounts = [];
+
+            // Initialize counts
+            for (let d = 1; d <= daysInMonth; d++) {
+                labels.push(`H-${d.toString().padStart(2, '0')}`);
+                dailyCounts.push(0);
+                cumulativeCounts.push(0);
+            }
+
+            // Populate daily exit counts
+            allRecords.forEach(rec => {
+                if (!rec.tanggal || rec.waktuKeluar === "-") return;
+                
+                const parts = rec.tanggal.split('-'); // DD-MM-YYYY
+                if (parts.length === 3) {
+                    const d = parseInt(parts[0], 10);
+                    const m = parseInt(parts[1], 10);
+                    const y = parseInt(parts[2], 10);
+
+                    if (m === bulan && y === tahun) {
+                        if (d >= 1 && d <= daysInMonth) {
+                            dailyCounts[d - 1]++;
+                        }
+                    }
+                }
+            });
+
+            // Calculate cumulative counts
+            let sum = 0;
+            for (let i = 0; i < daysInMonth; i++) {
+                sum += dailyCounts[i];
+                cumulativeCounts[i] = sum;
+            }
+
+            // Render Chart.js Canvas
+            const ctx = document.getElementById('outingsChart').getContext('2d');
+            
+            if (outingsChartInstance) {
+                outingsChartInstance.destroy();
+            }
+
+            outingsChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Jumlah Harian (Bar)',
+                            data: dailyCounts,
+                            backgroundColor: 'rgba(242, 148, 0, 0.45)',
+                            borderColor: '#f29400',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Kumulatif Keluar (Line)',
+                            data: cumulativeCounts,
+                            type: 'line',
+                            borderColor: '#005aa9',
+                            backgroundColor: 'rgba(0, 90, 169, 0.05)',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            fill: true,
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Frekuensi Harian',
+                                font: { weight: 'bold', size: 10 }
+                            },
+                            ticks: { precision: 0 },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Jumlah Kumulatif',
+                                font: { weight: 'bold', size: 10 }
+                            },
+                            ticks: { precision: 0 },
+                            grid: { drawOnChartArea: false } // prevent duplicate gridlines
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Plus Jakarta Sans', weight: 'bold', size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ================= DETAIL HARI INI LOGIC (C) =================
+        function filterTodayData() {
+            const todayStr = getTodayDateString();
+            const query = document.getElementById('search-today').value.toLowerCase().trim();
+
+            let data = allRecords.filter(r => r.tanggal === todayStr);
+
+            if (query) {
+                data = data.filter(r => r.nama.toLowerCase().includes(query));
+            }
+
+            todayData = data;
+            todayPage = 1; // Reset to page 1 on search
+            sortAndRenderTodayTable();
+        }
+
+        function sortAndRenderTodayTable() {
+            // Apply sorting
+            todayData.sort((a, b) => {
+                let valA = a[todaySortField] || "";
+                let valB = b[todaySortField] || "";
+
+                if (todaySortField === 'waktuKeluar' || todaySortField === 'waktuKembali') {
+                    // Normalize missing values for sorting
+                    if (valA === "-") valA = todaySortOrder === 'asc' ? "99:99" : "00:00";
+                    if (valB === "-") valB = todaySortOrder === 'asc' ? "99:99" : "00:00";
+                }
+
+                if (typeof valA === 'string') {
+                    return todaySortOrder === 'asc' 
+                        ? valA.localeCompare(valB) 
+                        : valB.localeCompare(valA);
+                } else {
+                    return todaySortOrder === 'asc' ? valA - valB : valB - valA;
+                }
+            });
+
+            // Update Sort Icons
+            const fields = ['nama', 'waktuKeluar', 'waktuKembali'];
+            fields.forEach(f => {
+                const icon = document.getElementById(`sort-icon-today-${f}`);
+                if (icon) {
+                    if (todaySortField === f) {
+                        icon.className = todaySortOrder === 'asc' 
+                            ? 'fa-solid fa-sort-up text-bpsBlue' 
+                            : 'fa-solid fa-sort-down text-bpsBlue';
+                    } else {
+                        icon.className = 'fa-solid fa-sort text-slate-300';
+                    }
+                }
+            });
+
+            renderTodayTable();
+        }
+
+        function renderTodayTable() {
+            const tbody = document.getElementById('today-tbody');
+            tbody.innerHTML = '';
+
+            const total = todayData.length;
+            const totalPages = Math.ceil(total / todayPageSize);
+
+            // Handle empty state
+            if (total === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Tidak ada data detail pegawai keluar hari ini.</td></tr>`;
+                document.getElementById('today-page-info').textContent = "Menampilkan 0 - 0 dari 0 data";
+                document.getElementById('btn-today-prev').disabled = true;
+                document.getElementById('btn-today-next').disabled = true;
+                return;
+            }
+
+            // Keep page in bound
+            if (todayPage > totalPages) todayPage = totalPages;
+            if (todayPage < 1) todayPage = 1;
+
+            const startIdx = (todayPage - 1) * todayPageSize;
+            const endIdx = Math.min(startIdx + todayPageSize, total);
+
+            const displayData = todayData.slice(startIdx, endIdx);
+
+            displayData.forEach(item => {
+                let durationBadge = "";
+                if (item.waktuKeluar !== "-" && item.waktuKembali !== "-") {
+                    durationBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                        <i class="fa-solid fa-check text-[10px]"></i> ${item.durasiTeks}
+                    </span>`;
+                } else if (item.waktuKeluar !== "-" && item.waktuKembali === "-") {
+                    const dur = calculateLiveDurationText(item.waktuKeluar);
+                    durationBadge = `<span class="live-duration-badge inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100 animate-pulse" data-keluar="${item.waktuKeluar}">
+                        <i class="fa-solid fa-spinner animate-spin text-[10px]"></i> ${dur} (Sedang Keluar)
+                    </span>`;
+                } else {
+                    durationBadge = `<span class="text-slate-400 font-medium">-</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 transition-all";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold text-slate-800">${item.nama}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-600">${item.waktuKeluar}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-600">${item.waktuKembali}</td>
+                    <td class="py-3 px-4">${durationBadge}</td>
+                    <td class="py-3 px-4 text-slate-500 max-w-[250px] truncate" title="${item.keterangan}">${item.keterangan}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Update page controls
+            document.getElementById('today-page-info').textContent = `Menampilkan ${startIdx + 1} - ${endIdx} dari ${total} data`;
+            document.getElementById('btn-today-prev').disabled = todayPage === 1;
+            document.getElementById('btn-today-next').disabled = todayPage === totalPages || totalPages === 0;
+        }
+
+        function toggleSortToday(field) {
+            if (todaySortField === field) {
+                todaySortOrder = todaySortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                todaySortField = field;
+                todaySortOrder = 'asc';
+            }
+            sortAndRenderTodayTable();
+        }
+
+        // Navigation controls
+        function prevTodayPage() {
+            if (todayPage > 1) {
+                todayPage--;
+                renderTodayTable();
+            }
+        }
+
+        function nextTodayPage() {
+            const totalPages = Math.ceil(todayData.length / todayPageSize);
+            if (todayPage < totalPages) {
+                todayPage++;
+                renderTodayTable();
+            }
+        }
+
+        // ================= RIWAYAT LOGIC (D) =================
+        function applyFiltersRiwayat() {
+            const queryName = document.getElementById('filter-riwayat-nama').value.toLowerCase().trim();
+            const filterDate = document.getElementById('filter-riwayat-tanggal').value; // YYYY-MM-DD
+            const filterMonth = document.getElementById('filter-riwayat-bulan').value;
+            const filterYear = document.getElementById('filter-riwayat-tahun').value;
+            const filterStatus = document.getElementById('filter-riwayat-status').value;
+
+            let data = [...allRecords];
+
+            // Filter by Name
+            if (queryName) {
+                data = data.filter(r => r.nama.toLowerCase().includes(queryName));
+            }
+
+            // Filter by Specific Date
+            if (filterDate) {
+                // Convert input date from YYYY-MM-DD to DD-MM-YYYY
+                const dateParts = filterDate.split('-');
+                if (dateParts.length === 3) {
+                    const formatInputDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+                    data = data.filter(r => r.tanggal === formatInputDate);
+                }
+            }
+
+            // Filter by Month
+            if (filterMonth) {
+                data = data.filter(r => {
+                    if (!r.tanggal) return false;
+                    const parts = r.tanggal.split('-');
+                    return parts.length === 3 && parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+                });
+            }
+
+            // Filter by Year
+            if (filterYear) {
+                data = data.filter(r => {
+                    if (!r.tanggal) return false;
+                    const parts = r.tanggal.split('-');
+                    return parts.length === 3 && parseInt(parts[2], 10) === parseInt(filterYear, 10);
+                });
+            }
+
+            // Filter by Status
+            if (filterStatus) {
+                if (filterStatus === 'Sedang Keluar') {
+                    data = data.filter(r => r.waktuKeluar !== "-" && r.waktuKembali === "-");
+                } else if (filterStatus === 'Selesai') {
+                    data = data.filter(r => r.waktuKeluar !== "-" && r.waktuKembali !== "-");
+                }
+            }
+
+            filteredRiwayatData = data;
+            riwayatPage = 1;
+            sortAndRenderRiwayatTable();
+        }
+
+        function sortAndRenderRiwayatTable() {
+            // Apply sorting
+            filteredRiwayatData.sort((a, b) => {
+                let valA = a[riwayatSortField] || "";
+                let valB = b[riwayatSortField] || "";
+
+                if (riwayatSortField === 'tanggal') {
+                    // Sort by parsed date
+                    const parseDate = (dStr) => {
+                        if (!dStr) return 0;
+                        const p = dStr.split('-');
+                        if (p.length === 3) return new Date(p[2], p[1]-1, p[0]).getTime();
+                        return 0;
+                    };
+                    valA = parseDate(valA);
+                    valB = parseDate(valB);
+                } else if (riwayatSortField === 'waktuKeluar' || riwayatSortField === 'waktuKembali') {
+                    if (valA === "-") valA = riwayatSortOrder === 'asc' ? "99:99" : "00:00";
+                    if (valB === "-") valB = riwayatSortOrder === 'asc' ? "99:99" : "00:00";
+                } else if (riwayatSortField === 'timestamp') {
+                    valA = valA ? new Date(valA).getTime() : 0;
+                    valB = valB ? new Date(valB).getTime() : 0;
+                }
+
+                if (typeof valA === 'string') {
+                    return riwayatSortOrder === 'asc' 
+                        ? valA.localeCompare(valB) 
+                        : valB.localeCompare(valA);
+                } else {
+                    return riwayatSortOrder === 'asc' ? valA - valB : valB - valA;
+                }
+            });
+
+            // Update sort icons
+            const fields = ['nama', 'tanggal', 'waktuKeluar', 'waktuKembali'];
+            fields.forEach(f => {
+                const icon = document.getElementById(`sort-icon-riwayat-${f}`);
+                if (icon) {
+                    if (riwayatSortField === f) {
+                        icon.className = riwayatSortOrder === 'asc' 
+                            ? 'fa-solid fa-sort-up text-bpsBlue' 
+                            : 'fa-solid fa-sort-down text-bpsBlue';
+                    } else {
+                        icon.className = 'fa-solid fa-sort text-slate-300';
+                    }
+                }
+            });
+
+            renderRiwayatTable();
+        }
+
+        function renderRiwayatTable() {
+            const tbody = document.getElementById('riwayat-tbody');
+            tbody.innerHTML = '';
+
+            const total = filteredRiwayatData.length;
+            const totalPages = Math.ceil(total / riwayatPageSize);
+
+            // Empty state
+            if (total === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">Tidak ada riwayat log keluar masuk pegawai.</td></tr>`;
+                document.getElementById('riwayat-page-info').textContent = "Menampilkan 0 - 0 dari 0 data";
+                document.getElementById('btn-riwayat-prev').disabled = true;
+                document.getElementById('btn-riwayat-next').disabled = true;
+                return;
+            }
+
+            // Keep in bounds
+            if (riwayatPage > totalPages) riwayatPage = totalPages;
+            if (riwayatPage < 1) riwayatPage = 1;
+
+            const startIdx = (riwayatPage - 1) * riwayatPageSize;
+            const endIdx = Math.min(startIdx + riwayatPageSize, total);
+
+            const displayData = filteredRiwayatData.slice(startIdx, endIdx);
+
+            displayData.forEach(item => {
+                let statusBadge = "";
+                let durationBadge = "";
+
+                if (item.waktuKeluar !== "-" && item.waktuKembali !== "-") {
+                    statusBadge = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                        <i class="fa-solid fa-circle-check text-[10px]"></i> Selesai
+                    </span>`;
+                    durationBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-100">${item.durasiTeks}</span>`;
+                } else if (item.waktuKeluar !== "-" && item.waktuKembali === "-") {
+                    statusBadge = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100 animate-pulse">
+                        <i class="fa-solid fa-spinner animate-spin text-[10px]"></i> Sedang Keluar
+                    </span>`;
+                    const dur = calculateLiveDurationText(item.waktuKeluar);
+                    durationBadge = `<span class="live-duration-badge inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100" data-keluar="${item.waktuKeluar}">${dur}</span>`;
+                } else {
+                    statusBadge = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-400 border border-slate-100">
+                        <i class="fa-solid fa-hourglass-start text-[10px]"></i> Menunggu
+                    </span>`;
+                    durationBadge = `<span class="text-slate-400 font-medium">-</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 transition-all";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold text-slate-800">${item.nama}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-500">${item.tanggal}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-600">${item.waktuKeluar}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-600">${item.waktuKembali}</td>
+                    <td class="py-3 px-4">${durationBadge}</td>
+                    <td class="py-3 px-4 text-slate-500 max-w-[200px] truncate" title="${item.keterangan}">${item.keterangan}</td>
+                    <td class="py-3 px-4">${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Update page controls
+            document.getElementById('riwayat-page-info').textContent = `Menampilkan ${startIdx + 1} - ${endIdx} dari ${total} data`;
+            document.getElementById('btn-riwayat-prev').disabled = riwayatPage === 1;
+            document.getElementById('btn-riwayat-next').disabled = riwayatPage === totalPages || totalPages === 0;
+        }
+
+        function toggleSortRiwayat(field) {
+            if (riwayatSortField === field) {
+                riwayatSortOrder = riwayatSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                riwayatSortField = field;
+                riwayatSortOrder = 'asc';
+            }
+            sortAndRenderRiwayatTable();
+        }
+
+        function prevRiwayatPage() {
+            if (riwayatPage > 1) {
+                riwayatPage--;
+                renderRiwayatTable();
+            }
+        }
+
+        function nextRiwayatPage() {
+            const totalPages = Math.ceil(filteredRiwayatData.length / riwayatPageSize);
+            if (riwayatPage < totalPages) {
+                riwayatPage++;
+                renderRiwayatTable();
+            }
+        }
+
+        // ================= ADMIN PENGELOLAAN LOGIC (E) =================
+        function renderManageData() {
+            const tbody = document.getElementById('manage-tbody');
+            tbody.innerHTML = '';
+
+            // Filter out active sessions (Went out, hasn't returned yet)
+            const activeSessions = allRecords.filter(r => r.waktuKeluar !== "-" && r.waktuKembali === "-");
+
+            if (activeSessions.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Tidak ada sesi aktif yang memerlukan pengelolaan saat ini.</td></tr>`;
+                return;
+            }
+
+            activeSessions.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 transition-all";
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 font-bold text-slate-800">${item.nama}</td>
+                    <td class="py-3.5 px-4 font-semibold text-slate-500">${item.tanggal}</td>
+                    <td class="py-3.5 px-4 font-semibold text-slate-600">${item.waktuKeluar}</td>
+                    <td class="py-3.5 px-4 text-slate-500 max-w-[200px] truncate" title="${item.keterangan}">${item.keterangan}</td>
+                    <td class="py-3.5 px-4 flex justify-center gap-2">
+                        <button onclick="openForceCompleteModal('${item.sessionId}', '${item.nama}', '${item.waktuKeluar}')" 
+                            class="flex-1 max-w-[120px] bg-bpsBlue hover:bg-opacity-90 active:scale-[0.98] text-white font-bold py-1.5 px-3 rounded-lg text-[10px] transition-all shadow-md shadow-bpsBlue/10">
+                            <i class="fa-solid fa-clock-rotate-left mr-1"></i> Selesaikan
+                        </button>
+                        <button onclick="confirmDeleteRecord('${item.sessionId}', '${item.nama}')" 
+                            class="bg-rose-50 border border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white py-1.5 px-3 rounded-lg text-[10px] transition-all">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Complete active outings manually
+        function openForceCompleteModal(sessionId, name, outTime) {
+            activeManageSessionId = sessionId;
+            activeManageEmployeeName = name;
+            activeManageOutTime = outTime;
+
+            document.getElementById('fc-nama').value = name;
+            document.getElementById('fc-keluar').value = outTime;
+            
+            // Default Jam Kembali to current HH:MM
+            const now = new Date();
+            const h = now.getHours().toString().padStart(2, '0');
+            const m = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('fc-kembali').value = `${h}:${m}`;
+
+            document.getElementById('modal-force-complete').classList.add('active');
+        }
+
+        function closeForceCompleteModal() {
+            document.getElementById('modal-force-complete').classList.remove('active');
+        }
+
+        async function submitForceComplete() {
+            const kembaliTime = document.getElementById('fc-kembali').value;
+            if (!kembaliTime) {
+                showCustomAlert("Input Error", "Silakan masukkan jam kembali terlebih dahulu.", "warning");
+                return;
+            }
+
+            closeForceCompleteModal();
+            showLoader(true);
+            try {
+                const res = await callAppsScript('adminForceCompleteSession', {
+                    sessionId: activeManageSessionId,
+                    nama: activeManageEmployeeName,
+                    time: kembaliTime
+                });
+                
+                showLoader(false);
+                if (res && res.success) {
+                    showCustomAlert("Berhasil", res.message || "Sesi berhasil diselesaikan.", "success");
+                    reloadData(true); // reload tables and stats
+                } else {
+                    showCustomAlert("Gagal", res.message || "Gagal menyelesaikan sesi.", "error");
+                }
+            } catch (err) {
+                showLoader(false);
+                showCustomAlert("Koneksi Error", "Gagal menghubungi server: " + err.toString(), "error");
+            }
+        }
+
+        // Delete active outing manual
+        function confirmDeleteRecord(sessionId, name) {
+            showCustomConfirm(
+                `Apakah Anda yakin ingin menghapus data keluar masuk pegawai <b>${name}</b> secara permanen dari database?`,
+                async function() {
+                    closeCustomConfirm();
+                    showLoader(true);
+                    try {
+                        const res = await callAppsScript('adminDeleteRecord', {
+                            sessionId: sessionId,
+                            nama: name
+                        });
+                        
+                        showLoader(false);
+                        if (res && res.success) {
+                            showCustomAlert("Berhasil Dihapus", res.message || "Data berhasil dihapus.", "success");
+                            reloadData(true);
+                        } else {
+                            showCustomAlert("Gagal", res.message || "Gagal menghapus data dari database.", "error");
+                        }
+                    } catch(err) {
+                        showLoader(false);
+                        showCustomAlert("Koneksi Error", "Gagal menghubungi server: " + err.toString(), "error");
+                    }
+                }
+            );
+        }
+
+        // ================= EXPORT EXCEL LOGIC (SheetJS) =================
+        function exportToExcel() {
+            if (filteredRiwayatData.length === 0) {
+                showCustomAlert("Export Kosong", "Tidak ada data riwayat log yang sesuai filter untuk diexport.", "warning");
+                return;
+            }
+
+            // Map data to readable excel rows
+            const excelRows = filteredRiwayatData.map((item, idx) => ({
+                "NO": idx + 1,
+                "NAMA PEGAWAI": item.nama,
+                "HARI": item.hari,
+                "TANGGAL": item.tanggal,
+                "JAM KELUAR": item.waktuKeluar,
+                "JAM KEMBALI": item.waktuKembali,
+                "DURASI": item.durasiTeks || "-",
+                "KETERANGAN KEPERLUAN": item.keterangan,
+                "STATUS": item.waktuKembali !== "-" ? "Selesai" : (item.waktuKeluar !== "-" ? "Sedang Keluar" : "Menunggu Keluar")
+            }));
+
+            // Create SheetJS Worksheet
+            const worksheet = XLSX.utils.json_to_sheet(excelRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Log SIKEMAS");
+
+            // Format column widths beautifully
+            const maxW = [5, 25, 10, 15, 12, 12, 20, 35, 15];
+            worksheet['!cols'] = maxW.map(w => ({ wch: w }));
+
+            // Trigger Download
+            const dateStr = getTodayDateString();
+            XLSX.writeFile(workbook, `SIKEMAS_Riwayat_Log_${dateStr}.xlsx`);
+        }
+
+        // ================= UI HELPERS =================
+        function switchTab(tabId, btn) {
+            // Hide all contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(el => el.classList.remove('active'));
+
+            // Show active tab
+            const activeTab = document.getElementById('tab-' + tabId);
+            if (activeTab) activeTab.classList.add('active');
+
+            // Un-highlight all nav buttons
+            const navButtons = document.querySelectorAll('.sidebar-nav-item');
+            navButtons.forEach(el => {
+                el.classList.remove('text-bpsBlue', 'bg-blue-50/50');
+                el.classList.add('text-slate-400', 'hover:text-slate-700', 'hover:bg-slate-50/50');
+            });
+
+            // Highlight active nav button
+            if (btn) {
+                btn.classList.remove('text-slate-400', 'hover:text-slate-700', 'hover:bg-slate-50/50');
+                btn.classList.add('text-bpsBlue', 'bg-blue-50/50');
+            }
+        }
+
+        // Sidebar Collapse/Expand Toggle
+        let sidebarCollapsed = false;
+        function toggleSidebar() {
+            sidebarCollapsed = !sidebarCollapsed;
+            const sidebar = document.getElementById('sidebar');
+            const mainWrapper = document.getElementById('main-wrapper');
+            const toggleIcon = document.getElementById('sidebar-toggle-icon');
+            
+            if (sidebarCollapsed) {
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-20');
+                mainWrapper.classList.remove('lg:pl-64');
+                mainWrapper.classList.add('lg:pl-20');
+                toggleIcon.className = 'fa-solid fa-chevron-right';
+                
+                // Hide text labels
+                const texts = document.querySelectorAll('.nav-text');
+                texts.forEach(t => t.classList.add('opacity-0', 'pointer-events-none', 'hidden'));
+                const logo = document.querySelectorAll('.logo-container');
+                logo.forEach(l => l.classList.add('opacity-0', 'hidden'));
+            } else {
+                sidebar.classList.remove('w-20');
+                sidebar.classList.add('w-64');
+                mainWrapper.classList.remove('lg:pl-20');
+                mainWrapper.classList.add('lg:pl-64');
+                toggleIcon.className = 'fa-solid fa-chevron-left';
+                
+                // Show text labels
+                setTimeout(() => {
+                    const texts = document.querySelectorAll('.nav-text');
+                    texts.forEach(t => t.classList.remove('opacity-0', 'pointer-events-none', 'hidden'));
+                    const logo = document.querySelectorAll('.logo-container');
+                    logo.forEach(l => l.classList.remove('opacity-0', 'hidden'));
+                }, 100);
+            }
+        }
+
+        // Custom Confirm Dialog Callers
+        function showCustomConfirm(message, callback) {
+            document.getElementById('confirm-message').innerHTML = message;
+            activeConfirmCallback = callback;
+            
+            const btn = document.getElementById('btn-confirm-action');
+            btn.onclick = callback;
+            
+            document.getElementById('custom-confirm').classList.add('active');
+        }
+
+        function closeCustomConfirm() {
+            document.getElementById('custom-confirm').classList.remove('active');
+            activeConfirmCallback = null;
+        }
+
+        // Custom Alert Dialog Callers
+        function showCustomAlert(title, message, type = "info") {
+            const modal = document.getElementById('custom-alert');
+            const titleEl = document.getElementById('modal-title');
+            const msgEl = document.getElementById('modal-message');
+            const iconEl = document.getElementById('modal-icon');
+
+            titleEl.textContent = title;
+            msgEl.innerHTML = message; // Support bold text in confirmation
+
+            iconEl.className = "w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl";
+            
+            if (type === "success") {
+                iconEl.classList.add("bg-emerald-50", "text-emerald-500");
+                iconEl.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            } else if (type === "error") {
+                iconEl.classList.add("bg-rose-50", "text-rose-500");
+                iconEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+            } else if (type === "warning") {
+                iconEl.classList.add("bg-amber-50", "text-amber-500");
+                iconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            } else {
+                iconEl.classList.add("bg-blue-50", "text-bpsBlue");
+                iconEl.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+            }
+
+            modal.classList.add('active');
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('custom-alert').classList.remove('active');
+        }
+
+        // ================= GENERAL HELPERS =================
+        function getTodayDateString() {
+            const now = new Date();
+            const d = now.getDate().toString().padStart(2, '0');
+            const m = (now.getMonth() + 1).toString().padStart(2, '0');
+            const y = now.getFullYear();
+            return `${d}-${m}-${y}`;
+        }
+
+        // Calculate live outing duration
+        function calculateLiveDurationText(waktuKeluar) {
+            if (!waktuKeluar || waktuKeluar === "-") return "-";
+            try {
+                const parts = waktuKeluar.split(':');
+                if (parts.length >= 2) {
+                    const startH = parseInt(parts[0], 10);
+                    const startM = parseInt(parts[1], 10);
+                    
+                    const now = new Date();
+                    const endH = now.getHours();
+                    const endM = now.getMinutes();
+                    
+                    let diff = (endH * 60 + endM) - (startH * 60 + startM);
+                    if (diff < 0) diff += 24 * 60; // middle of the night correction
+                    
+                    const h = Math.floor(diff / 60);
+                    const m = diff % 60;
+                    
+                    if (h > 0) return `${h} jam ${m} menit`;
+                    return `${m} menit`;
+                }
+            } catch(e) {}
+            return "-";
+        }
+    </script>
+</body>
+
+</html>
