@@ -345,8 +345,10 @@
         </button>
     </div>
 
-<script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyv-BnYEzLO41NkhkG9kRxuZQ_AzgbF51hamfACEbokj4WTdWhicwPsR5wrJ2Xa3W4Z/exec";
+    <script>
+        // Konfigurasi URL Google Apps Script
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyv-BnYEzLO41NkhkG9kRxuZQ_AzgbF51hamfACEbokj4WTdWhicwPsR5wrJ2Xa3W4Z/exec";
+        
         // State Manajemen Sesi Aktif
         let activeSession = {
             active: false,
@@ -491,41 +493,132 @@
             closeCustomConfirm();
         }
 
-        // Memanggil daftar nama dari Google Sheets dan memasukkannya ke elemen select (dropdown)
-        // Dibuat lebih aman dengan melestarikan nama terpilih jika browser direfresh
-        function loadEmployeeDropdown() {
-            google.script.run
-                .withSuccessHandler(names => {
-                    const select = document.getElementById('nama');
-                    select.innerHTML = '<option value="" disabled selected>Pilih nama Anda...</option>';
-                    if (names && names.length > 0) {
-                        names.forEach(name => {
-                            const option = document.createElement('option');
-                            option.value = name;
-                            option.textContent = name;
-                            select.appendChild(option);
-                        });
-
-                        // Set nilai ke nama yang aktif di sesi jika ada sesi berjalan
-                        if (activeSession && activeSession.active) {
-                            select.value = activeSession.nama;
-                        }
-                    } else {
-                        select.innerHTML = '<option value="" disabled selected>Daftar pegawai kosong (Sheet User)</option>';
-                    }
-                })
-                .withFailureHandler(err => {
-                    const select = document.getElementById('nama');
-                    select.innerHTML = '<option value="" disabled selected>Gagal memuat nama</option>';
-                    showCustomAlert("Dropdown Error", "Gagal memuat daftar pegawai dari Sheet 'User'.", "error");
-                })
-                .getEmployeeNames();
+        // ================= FUNGSI API CALL =================
+        
+        // Fungsi untuk memanggil Google Apps Script dengan fetch
+        async function callAppsScript(action, data = {}) {
+            try {
+                const payload = {
+                    action: action,
+                    ...data
+                };
+                
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                // Karena mode: 'no-cors', response tidak bisa dibaca
+                // Kita perlu menggunakan pendekatan alternatif dengan JSONP atau redirect
+                // Untuk solusi sementara, kita akan menggunakan pendekatan dengan iframe
+                return await handleResponseWithIframe(action, payload);
+            } catch (error) {
+                console.error('Error calling Apps Script:', error);
+                throw error;
+            }
         }
 
-        // ================= LOGIKA SESI DAN AKSI PRESENSI =================
+        // Pendekatan alternatif menggunakan iframe untuk komunikasi
+        function handleResponseWithIframe(action, payload) {
+            return new Promise((resolve, reject) => {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                
+                // Buat form untuk submit data
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = SCRIPT_URL;
+                form.target = 'appsScriptFrame';
+                
+                // Tambahkan data ke form
+                const dataInput = document.createElement('input');
+                dataInput.type = 'hidden';
+                dataInput.name = 'data';
+                dataInput.value = JSON.stringify(payload);
+                form.appendChild(dataInput);
+                
+                // Tambahkan callback untuk hasil
+                window.appsScriptCallback = function(result) {
+                    document.body.removeChild(iframe);
+                    delete window.appsScriptCallback;
+                    try {
+                        const parsed = typeof result === 'string' ? JSON.parse(result) : result;
+                        resolve(parsed);
+                    } catch (e) {
+                        resolve(result);
+                    }
+                };
+                
+                // Tambahkan event listener untuk pesan dari iframe
+                const messageHandler = function(event) {
+                    if (event.data && event.data.type === 'appsScriptResult') {
+                        window.removeEventListener('message', messageHandler);
+                        window.appsScriptCallback(event.data.result);
+                    }
+                };
+                window.addEventListener('message', messageHandler);
+                
+                // Append iframe dan form ke body
+                iframe.name = 'appsScriptFrame';
+                document.body.appendChild(iframe);
+                document.body.appendChild(form);
+                form.submit();
+                
+                // Timeout untuk menghindari hang
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                    if (document.body.contains(form)) {
+                        document.body.removeChild(form);
+                    }
+                    reject(new Error('Request timeout'));
+                }, 30000);
+            });
+        }
 
-        // Menyimpan rencana kegiatan awal
-        function submitData() {
+        // ================= FUNGSI UNTUK DROPDOWN =================
+        
+        async function loadEmployeeDropdown() {
+            try {
+                showLoader(true);
+                const result = await callAppsScript('getEmployeeNames');
+                showLoader(false);
+                
+                const select = document.getElementById('nama');
+                select.innerHTML = '<option value="" disabled selected>Pilih nama Anda...</option>';
+                
+                if (result && result.success && result.data && result.data.length > 0) {
+                    result.data.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        select.appendChild(option);
+                    });
+
+                    // Set nilai ke nama yang aktif di sesi jika ada sesi berjalan
+                    if (activeSession && activeSession.active) {
+                        select.value = activeSession.nama;
+                    }
+                } else {
+                    select.innerHTML = '<option value="" disabled selected>Daftar pegawai kosong (Sheet User)</option>';
+                }
+            } catch (error) {
+                showLoader(false);
+                const select = document.getElementById('nama');
+                select.innerHTML = '<option value="" disabled selected>Gagal memuat nama</option>';
+                showCustomAlert("Dropdown Error", "Gagal memuat daftar pegawai dari Sheet 'User'.", "error");
+                console.error('Error loading employee dropdown:', error);
+            }
+        }
+
+        // ================= FUNGSI UNTUK MENYIMPAN DATA =================
+
+        async function submitData() {
             const namaSelect = document.getElementById('nama');
             const nama = namaSelect.value;
             const tgl = document.getElementById('tanggal').value;
@@ -542,50 +635,51 @@
             }
 
             showLoader(true);
-            const payload = {
-                nama: nama,
-                tanggal: tgl,
-                hari: hari,
-                waktuKeluar: "-",
-                waktuKembali: "-",
-                keterangan: ket
-            };
+            try {
+                const payload = {
+                    nama: nama,
+                    tanggal: tgl,
+                    hari: hari,
+                    waktuKeluar: "-",
+                    waktuKembali: "-",
+                    keterangan: ket
+                };
 
-            google.script.run
-                .withSuccessHandler(res => {
-                    showLoader(false);
-                    if (res.success) {
-                        // Daftarkan Sesi Aktif Baru
-                        activeSession = {
-                            active: true,
-                            rowIndex: res.rowIndex,
-                            sessionId: res.sessionId, // Simpan Session ID dari server
-                            nama: nama,
-                            tanggal: formatDateStr(tgl),
-                            hari: hari,
-                            keterangan: ket,
-                            waktuKeluar: "-",
-                            waktuKembali: "-",
-                            status: "menunggu_keluar"
-                        };
-                        saveSessionToStorage();
-                        renderActiveSession();
-                        updateNavRiwayatState();
-                        loadHistory(); // Langsung perbarui riwayat setelah menyimpan data keterangan
-                        showCustomAlert("Berhasil Tersimpan", res.message, "success");
-                    } else {
-                        showCustomAlert("Gagal", res.message, "error");
-                    }
-                })
-                .withFailureHandler(err => {
-                    showLoader(false);
-                    showCustomAlert("Koneksi Gagal", "Gagal menghubungi server: " + err.toString(), "error");
-                })
-                .saveRecord(payload);
+                const result = await callAppsScript('saveRecord', payload);
+                showLoader(false);
+
+                if (result && result.success) {
+                    // Daftarkan Sesi Aktif Baru
+                    activeSession = {
+                        active: true,
+                        rowIndex: result.rowIndex,
+                        sessionId: result.sessionId || Date.now().toString(), // Generate ID jika tidak ada dari server
+                        nama: nama,
+                        tanggal: formatDateStr(tgl),
+                        hari: hari,
+                        keterangan: ket,
+                        waktuKeluar: "-",
+                        waktuKembali: "-",
+                        status: "menunggu_keluar"
+                    };
+                    saveSessionToStorage();
+                    renderActiveSession();
+                    updateNavRiwayatState();
+                    loadHistory(); // Langsung perbarui riwayat setelah menyimpan data keterangan
+                    showCustomAlert("Berhasil Tersimpan", result.message || "Data berhasil disimpan.", "success");
+                } else {
+                    showCustomAlert("Gagal", result?.message || "Gagal menyimpan data.", "error");
+                }
+            } catch (error) {
+                showLoader(false);
+                showCustomAlert("Koneksi Gagal", "Gagal menghubungi server: " + error.toString(), "error");
+                console.error('Error submitting data:', error);
+            }
         }
 
-        // Presensi Jam Keluar / Jam Kembali secara instant
-        function sessionCaptureTime(type) {
+        // ================= FUNGSI PRESENSI =================
+
+        async function sessionCaptureTime(type) {
             // Validasi urutan aksi tombol
             if (type === 'kembali' && activeSession.status === 'menunggu_keluar') {
                 showCustomAlert("Belum Diperbolehkan", "Anda harus mencatat Jam Keluar terlebih dahulu.", "warning");
@@ -597,35 +691,246 @@
                 now.getMinutes().toString().padStart(2, '0');
 
             showLoader(true);
-            google.script.run
-                .withSuccessHandler(res => {
-                    showLoader(false);
-                    if (res.success) {
-                        if (type === 'keluar') {
-                            activeSession.waktuKeluar = timeStr;
-                            activeSession.status = "sedang_keluar";
-                            showCustomAlert("Jam Keluar Dicatat", `Selamat jalan, silakan bertugas dengan lancar. Jam keberangkatan Anda: ${timeStr}`, "success");
-                        } else if (type === 'kembali') {
-                            activeSession.waktuKembali = timeStr;
-                            activeSession.status = "sudah_kembali";
-                            showCustomAlert("Selesai Lengkap", "Data keterangan kegiatan Anda telah tersimpan lengkap. Selamat datang kembali di kantor!", "success");
-                        }
-                        saveSessionToStorage();
-                        renderActiveSession();
-                        updateNavRiwayatState();
-                        loadHistory(); // Langsung perbarui riwayat di tab belakang secara dinamis
-                    } else {
-                        showCustomAlert("Aksi Gagal", res.message, "warning");
+            try {
+                const result = await callAppsScript('updateTime', {
+                    sessionId: activeSession.sessionId,
+                    nama: activeSession.nama,
+                    type: type,
+                    time: timeStr
+                });
+                showLoader(false);
+
+                if (result && result.success) {
+                    if (type === 'keluar') {
+                        activeSession.waktuKeluar = timeStr;
+                        activeSession.status = "sedang_keluar";
+                        showCustomAlert("Jam Keluar Dicatat", `Selamat jalan, silakan bertugas dengan lancar. Jam keberangkatan Anda: ${timeStr}`, "success");
+                    } else if (type === 'kembali') {
+                        activeSession.waktuKembali = timeStr;
+                        activeSession.status = "sudah_kembali";
+                        showCustomAlert("Selesai Lengkap", "Data keterangan kegiatan Anda telah tersimpan lengkap. Selamat datang kembali di kantor!", "success");
                     }
-                })
-                .withFailureHandler(err => {
-                    showLoader(false);
-                    showCustomAlert("Koneksi Gagal", "Gagal menyimpan waktu presensi: " + err.toString(), "error");
-                })
-                .updateTimeSafe(activeSession.sessionId, activeSession.nama, type, timeStr);
+                    saveSessionToStorage();
+                    renderActiveSession();
+                    updateNavRiwayatState();
+                    loadHistory(); // Langsung perbarui riwayat di tab belakang secara dinamis
+                } else {
+                    showCustomAlert("Aksi Gagal", result?.message || "Gagal menyimpan waktu presensi.", "warning");
+                }
+            } catch (error) {
+                showLoader(false);
+                showCustomAlert("Koneksi Gagal", "Gagal menyimpan waktu presensi: " + error.toString(), "error");
+                console.error('Error capturing time:', error);
+            }
         }
 
-        // Sinkronisasi status, warna, dan fungsionalitas tombol sesi aktif
+        // ================= FUNGSI RESET SESSION =================
+
+        async function resetSessionOnServer() {
+            showLoader(true);
+            try {
+                const result = await callAppsScript('deleteRecord', {
+                    sessionId: activeSession.sessionId,
+                    nama: activeSession.nama
+                });
+                showLoader(false);
+
+                if (result && result.success) {
+                    completeAndClearSession(); // Bersihkan UI dan LocalStorage
+                    showCustomAlert("Sesi Dibatalkan", result.message || "Sesi berhasil direset.", "success");
+                } else {
+                    showCustomAlert("Gagal Reset", result?.message || "Gagal mereset sesi.", "error");
+                }
+            } catch (error) {
+                showLoader(false);
+                showCustomAlert("Koneksi Gagal", "Gagal menghubungi server untuk menghapus rencana kegiatan: " + error.toString(), "error");
+                console.error('Error resetting session:', error);
+            }
+        }
+
+        // Konfirmasi reset paksa menggunakan custom pop up confirm (bukan window.confirm)
+        function confirmResetSession() {
+            showCustomConfirm(
+                "Apakah Anda yakin ingin me-reset sesi presensi aktif ini? Sesi Anda beserta data rencana kegiatan ini akan sepenuhnya terhapus dari database SIKEMAS.",
+                function () {
+                    resetSessionOnServer();
+                }
+            );
+        }
+
+        // ================= SINKRONISASI SESSION =================
+
+        async function syncSessionWithServer() {
+            if (!activeSession.active || !activeSession.nama) return;
+            
+            try {
+                const result = await callAppsScript('checkSession', {
+                    sessionId: activeSession.sessionId,
+                    nama: activeSession.nama
+                });
+                
+                if (result && result.found) {
+                    // Sinkronisasi data mutakhir dari server spreadsheet
+                    activeSession.waktuKeluar = result.waktuKeluar || "-";
+                    activeSession.waktuKembali = result.waktuKembali || "-";
+                    
+                    if (activeSession.waktuKembali !== "-") {
+                        activeSession.status = "sudah_kembali";
+                    } else if (activeSession.waktuKeluar !== "-") {
+                        activeSession.status = "sedang_keluar";
+                    } else {
+                        activeSession.status = "menunggu_keluar";
+                    }
+                    
+                    saveSessionToStorage();
+                    renderActiveSession();
+                    updateNavRiwayatState();
+                } else {
+                    // Jika sesi tidak ditemukan di database server (misal dihapus admin), hapus lokal
+                    completeAndClearSession();
+                }
+            } catch (error) {
+                console.log("Failed to sync session with server: " + error.toString());
+            }
+        }
+
+        // ================= FUNGSI LOAD HISTORY =================
+
+        async function loadHistory() {
+            // Tentukan nama pegawai yang sedang login/dipilih
+            const employeeName = activeSession.active ? activeSession.nama : document.getElementById('nama').value;
+            if (!employeeName) {
+                const list = document.getElementById('history-list');
+                list.innerHTML = `
+                    <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                        <i class="fa-solid fa-user-slash text-4xl mb-2 text-slate-200 block"></i>
+                        <span class="text-xs font-semibold">Pilih Nama Pegawai terlebih dahulu untuk melihat riwayat.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            showLoader(true);
+            try {
+                const result = await callAppsScript('getRecords', { nama: employeeName });
+                showLoader(false);
+                const list = document.getElementById('history-list');
+
+                if (!result || !result.success || !result.data) {
+                    list.innerHTML = `
+                        <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                            <i class="fa-solid fa-circle-exclamation text-4xl mb-2 text-rose-300 block"></i>
+                            <span class="text-xs font-semibold">Format data tidak sesuai atau gagal memproses database. Silakan segarkan halaman.</span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const data = result.data;
+                list.innerHTML = data.length ? "" : `
+                    <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                        <i class="fa-solid fa-folder-open text-4xl mb-2 text-slate-200 block"></i>
+                        <span class="text-xs font-semibold">Belum ada riwayat aktivitas yang tercatat.</span>
+                    </div>
+                `;
+
+                data.forEach(r => {
+                    const sanitizedKeluar = sanitizeTime(r.waktuKeluar);
+                    const sanitizedKembali = sanitizeTime(r.waktuKembali);
+
+                    // Desain visual badge di list riwayat
+                    let timeBadge = '';
+                    if (sanitizedKeluar !== "-" && sanitizedKembali !== "-") {
+                        timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 font-bold border border-emerald-100/80 flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Selesai</span>';
+                    } else if (sanitizedKeluar !== "-") {
+                        timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 font-bold border border-blue-100/80 flex items-center gap-1"><i class="fa-solid fa-person-walking animate-pulse"></i> Sedang Keluar</span>';
+                    } else {
+                        timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 font-bold border border-amber-100/80 flex items-center gap-1"><i class="fa-solid fa-clock"></i> Terdaftar</span>';
+                    }
+
+                    list.innerHTML += `
+                        <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="font-extrabold text-slate-800 text-sm tracking-wide">${r.nama}</h3>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">${r.hari}, ${r.tanggal}</p>
+                                </div>
+                                ${timeBadge}
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-amber-100/70 flex items-center justify-center text-bpsOrange text-[10px]">
+                                        <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-[9px] text-slate-400 block font-bold uppercase">Keluar</span>
+                                        <span class="font-bold text-slate-700">${sanitizedKeluar}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-blue-100/70 flex items-center justify-center text-bpsBlue text-[10px]">
+                                        <i class="fa-solid fa-arrow-down-to-bracket"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-[9px] text-slate-400 block font-bold uppercase">Kembali</span>
+                                        <span class="font-bold text-slate-700">${sanitizedKembali}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-t border-slate-100/80 pt-2.5">
+                                <span class="text-[9px] font-bold text-bpsBlue uppercase tracking-wider block mb-0.5">Keperluan:</span>
+                                <p class="text-xs text-slate-600 italic leading-relaxed">"${r.keterangan}"</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                showLoader(false);
+                const list = document.getElementById('history-list');
+                list.innerHTML = `
+                    <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                        <i class="fa-solid fa-circle-exclamation text-4xl mb-2 text-rose-300 block"></i>
+                        <span class="text-xs font-semibold">Gagal memuat database riwayat: ${error.toString()}</span>
+                    </div>
+                `;
+                console.error('Error loading history:', error);
+            }
+        }
+
+        // ================= FUNGSI UTILITY =================
+
+        // Selesaikan Sesi, bersihkan penyimpanan, dan buka kembali Form Input
+        function completeAndClearSession() {
+            activeSession = {
+                active: false,
+                rowIndex: null,
+                sessionId: "",
+                nama: "",
+                tanggal: "",
+                hari: "",
+                keterangan: "",
+                waktuKeluar: "-",
+                waktuKembali: "-",
+                status: "menunggu_keluar"
+            };
+            localStorage.removeItem('sikemas_session');
+            document.getElementById('keterangan').value = "";
+
+            // Atur ulang dropdown ke opsi default
+            document.getElementById('nama').value = "";
+
+            renderActiveSession();
+            initDate();
+            
+            // Redirect ke tab input secara aman
+            switchTab('input', document.getElementById('btn-nav-input'));
+            updateNavRiwayatState();
+            loadHistory(); // Reload riwayat akhir
+        }
+
+        // Render sesi aktif
         function renderActiveSession() {
             const formPanel = document.getElementById('panel-form');
             const sessionPanel = document.getElementById('panel-session');
@@ -715,98 +1020,6 @@
             }
         }
 
-        // Selesaikan Sesi, bersihkan penyimpanan, dan buka kembali Form Input
-        function completeAndClearSession() {
-            activeSession = {
-                active: false,
-                rowIndex: null,
-                sessionId: "",
-                nama: "",
-                tanggal: "",
-                hari: "",
-                keterangan: "",
-                waktuKeluar: "-",
-                waktuKembali: "-",
-                status: "menunggu_keluar"
-            };
-            localStorage.removeItem('sikemas_session');
-            document.getElementById('keterangan').value = "";
-
-            // Atur ulang dropdown ke opsi default
-            document.getElementById('nama').value = "";
-
-            renderActiveSession();
-            initDate();
-            
-            // Redirect ke tab input secara aman
-            switchTab('input', document.getElementById('btn-nav-input'));
-            updateNavRiwayatState();
-            loadHistory(); // Reload riwayat akhir
-        }
-
-        // Fungsi Reset Sesi beserta penghapusan baris data bersangkutan di database Google Sheets secara aman
-        function resetSessionOnServer() {
-            showLoader(true);
-            google.script.run
-                .withSuccessHandler(res => {
-                    showLoader(false);
-                    if (res.success) {
-                        completeAndClearSession(); // Bersihkan UI dan LocalStorage
-                        showCustomAlert("Sesi Dibatalkan", res.message, "success");
-                    } else {
-                        showCustomAlert("Gagal Reset", res.message, "error");
-                    }
-                })
-                .withFailureHandler(err => {
-                    showLoader(false);
-                    showCustomAlert("Koneksi Gagal", "Gagal menghubungi server untuk menghapus rencana kegiatan: " + err.toString(), "error");
-                })
-                .deleteRecordSafe(activeSession.sessionId, activeSession.nama);
-        }
-
-        // Konfirmasi reset paksa menggunakan custom pop up confirm (bukan window.confirm)
-        function confirmResetSession() {
-            showCustomConfirm(
-                "Apakah Anda yakin ingin me-reset sesi presensi aktif ini? Sesi Anda beserta data rencana kegiatan ini akan sepenuhnya terhapus dari database SIKEMAS.",
-                function () {
-                    resetSessionOnServer();
-                }
-            );
-        }
-
-        // Sinkronisasi status sesi aktif di server saat aplikasi dibuka/direfresh (pencegah inkonsistensi)
-        function syncSessionWithServer() {
-            if (!activeSession.active || !activeSession.nama) return;
-            
-            google.script.run
-                .withSuccessHandler(res => {
-                    if (res && res.found) {
-                        // Sinkronisasi data mutakhir dari server spreadsheet
-                        activeSession.waktuKeluar = res.waktuKeluar;
-                        activeSession.waktuKembali = res.waktuKembali;
-                        
-                        if (res.waktuKembali !== "-") {
-                            activeSession.status = "sudah_kembali";
-                        } else if (res.waktuKeluar !== "-") {
-                            activeSession.status = "sedang_keluar";
-                        } else {
-                            activeSession.status = "menunggu_keluar";
-                        }
-                        
-                        saveSessionToStorage();
-                        renderActiveSession();
-                        updateNavRiwayatState();
-                    } else {
-                        // Jika sesi tidak ditemukan di database server (misal dihapus admin), hapus lokal
-                        completeAndClearSession();
-                    }
-                })
-                .withFailureHandler(err => {
-                    console.log("Failed to sync session with server: " + err.toString());
-                })
-                .checkSessionActive(activeSession.sessionId, activeSession.nama);
-        }
-
         // Helper Penyimpanan Lokal (Local Storage)
         function saveSessionToStorage() {
             localStorage.setItem('sikemas_session', JSON.stringify(activeSession));
@@ -815,8 +1028,12 @@
         function loadActiveSession() {
             const data = localStorage.getItem('sikemas_session');
             if (data) {
-                activeSession = JSON.parse(data);
-                renderActiveSession();
+                try {
+                    activeSession = JSON.parse(data);
+                    renderActiveSession();
+                } catch (e) {
+                    console.error('Error loading session:', e);
+                }
             }
         }
 
@@ -845,109 +1062,7 @@
             }
             return val;
         }
-
-        // ================= LOADING RIWAYAT DARI SPREADSHEET =================
-
-        function loadHistory() {
-            // Tentukan nama pegawai yang sedang login/dipilih
-            const employeeName = activeSession.active ? activeSession.nama : document.getElementById('nama').value;
-            if (!employeeName) {
-                const list = document.getElementById('history-list');
-                list.innerHTML = `
-                    <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
-                        <i class="fa-solid fa-user-slash text-4xl mb-2 text-slate-200 block"></i>
-                        <span class="text-xs font-semibold">Pilih Nama Pegawai terlebih dahulu untuk melihat riwayat.</span>
-                    </div>
-                `;
-                return;
-            }
-
-            showLoader(true);
-            google.script.run
-                .withSuccessHandler(data => {
-                    showLoader(false);
-                    const list = document.getElementById('history-list');
-
-                    if (!data || !Array.isArray(data)) {
-                        list.innerHTML = `
-                            <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
-                                <i class="fa-solid fa-circle-exclamation text-4xl mb-2 text-rose-300 block"></i>
-                                <span class="text-xs font-semibold">Format data tidak sesuai atau gagal memproses database. Silakan segarkan halaman.</span>
-                            </div>
-                        `;
-                        return;
-                    }
-
-                    list.innerHTML = data.length ? "" : `
-                        <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
-                            <i class="fa-solid fa-folder-open text-4xl mb-2 text-slate-200 block"></i>
-                            <span class="text-xs font-semibold">Belum ada riwayat aktivitas yang tercatat.</span>
-                        </div>
-                    `;
-
-                    data.forEach(r => {
-                        const sanitizedKeluar = sanitizeTime(r.waktuKeluar);
-                        const sanitizedKembali = sanitizeTime(r.waktuKembali);
-
-                        // Desain visual badge di list riwayat
-                        let timeBadge = '';
-                        if (sanitizedKeluar !== "-" && sanitizedKembali !== "-") {
-                            timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 font-bold border border-emerald-100/80 flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Selesai</span>';
-                        } else if (sanitizedKeluar !== "-") {
-                            timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 font-bold border border-blue-100/80 flex items-center gap-1"><i class="fa-solid fa-person-walking animate-pulse"></i> Sedang Keluar</span>';
-                        } else {
-                            timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 font-bold border border-amber-100/80 flex items-center gap-1"><i class="fa-solid fa-clock"></i> Terdaftar</span>';
-                        }
-
-                        list.innerHTML += `
-                            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h3 class="font-extrabold text-slate-800 text-sm tracking-wide">${r.nama}</h3>
-                                        <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">${r.hari}, ${r.tanggal}</p>
-                                    </div>
-                                    ${timeBadge}
-                                </div>
-                                
-                                <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-amber-100/70 flex items-center justify-center text-bpsOrange text-[10px]">
-                                            <i class="fa-solid fa-arrow-up-from-bracket"></i>
-                                        </div>
-                                        <div>
-                                            <span class="text-[9px] text-slate-400 block font-bold uppercase">Keluar</span>
-                                            <span class="font-bold text-slate-700">${sanitizedKeluar}</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-blue-100/70 flex items-center justify-center text-bpsBlue text-[10px]">
-                                            <i class="fa-solid fa-arrow-down-to-bracket"></i>
-                                        </div>
-                                        <div>
-                                            <span class="text-[9px] text-slate-400 block font-bold uppercase">Kembali</span>
-                                            <span class="font-bold text-slate-700">${sanitizedKembali}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="border-t border-slate-100/80 pt-2.5">
-                                    <span class="text-[9px] font-bold text-bpsBlue uppercase tracking-wider block mb-0.5">Keperluan:</span>
-                                    <p class="text-xs text-slate-600 italic leading-relaxed">"${r.keterangan}"</p>
-                                </div>
-                            </div>
-                        `;
-                    });
-                })
-                .withFailureHandler(err => {
-                    showLoader(false);
-                    const list = document.getElementById('history-list');
-                    list.innerHTML = `
-                        <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
-                            <i class="fa-solid fa-circle-exclamation text-4xl mb-2 text-rose-300 block"></i>
-                            <span class="text-xs font-semibold">Gagal memuat database riwayat: ${err.toString()}</span>
-                        </div>
-                    `;
-                })
-                .getRecords(employeeName); // Kirim parameter nama ke server
-        }
     </script>
+</body>
+
+</html>
