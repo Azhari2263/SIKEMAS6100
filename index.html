@@ -396,7 +396,7 @@
             </main>
 
             <!-- Desktop/PC Footer inside content wrapper -->
-            <footer class="text-center pt-4 pb-28 lg:pb-6 px-4 text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-1 mt-6 border-t border-slate-100/30 lg:border-t-0">
+            <footer class="text-center pt-4 pb-20 lg:pb-6 px-4 text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-1 mt-6 border-t border-slate-100/30 lg:border-t-0">
                 <p>SIKEMAS BPS PROVINSI KALIMANTAN BARAT</p>
                 <p>Copyright &copy; 2026 Tim Umum dan Humas</p>
             </footer>
@@ -460,9 +460,6 @@
 
             // Mulai Jam Digital & Tanggal Real-time
             startLiveClock();
-
-            // Atur scroll viewport berdasarkan tab aktif (Input tab non-scrollable di mobile)
-            adjustViewportScroll();
         }
 
         // Variabel Status Sidebar
@@ -600,33 +597,7 @@
             document.getElementById('tab-' + tabId).classList.add('active');
 
             if (tabId === 'riwayat') loadHistory(true);
-
-            // Atur scroll viewport berdasarkan tab aktif (Input tab non-scrollable di mobile)
-            adjustViewportScroll();
         }
-
-        // Atur agar tab Input tidak bisa di-scroll (tampilan tetap/fixed) pada mobile
-        function adjustViewportScroll() {
-            const activeTab = document.querySelector('.tab-content.active');
-            if (!activeTab) return;
-            const tabId = activeTab.id.replace('tab-', '');
-            
-            if (window.innerWidth < 1024) {
-                if (tabId === 'input') {
-                    document.body.classList.add('overflow-hidden');
-                    document.documentElement.classList.add('overflow-hidden');
-                } else {
-                    document.body.classList.remove('overflow-hidden');
-                    document.documentElement.classList.remove('overflow-hidden');
-                }
-            } else {
-                document.body.classList.remove('overflow-hidden');
-                document.documentElement.classList.remove('overflow-hidden');
-            }
-        }
-
-        // Jalankan penyesuaian scroll saat ukuran layar berubah
-        window.addEventListener('resize', adjustViewportScroll);
 
         // Kalkulasi Hari Otomatis
         function updateHari(val) {
