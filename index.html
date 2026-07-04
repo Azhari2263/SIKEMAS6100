@@ -378,7 +378,7 @@
             
             // Perbarui status tampilan tombol riwayat di navbar
             updateNavRiwayatState();
-            loadHistory(); // Pre-load riwayat
+            loadHistory(false); // Pre-load riwayat
         }
 
         // Memperbarui tampilan menu nav Riwayat (disable/dimmed jika belum mencatat jam keluar)
@@ -420,7 +420,7 @@
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.getElementById('tab-' + tabId).classList.add('active');
 
-            if (tabId === 'riwayat') loadHistory();
+            if (tabId === 'riwayat') loadHistory(true);
         }
 
         // Kalkulasi Hari Otomatis
@@ -621,7 +621,7 @@
                     saveSessionToStorage();
                     renderActiveSession();
                     updateNavRiwayatState();
-                    loadHistory(); // Langsung perbarui riwayat setelah menyimpan data keterangan
+                    loadHistory(false); // Langsung perbarui riwayat setelah menyimpan data keterangan
                     showCustomAlert("Berhasil Tersimpan", result.message || "Data berhasil disimpan.", "success");
                 } else {
                     showCustomAlert("Gagal", result?.message || "Gagal menyimpan data.", "error");
@@ -669,7 +669,7 @@
                     saveSessionToStorage();
                     renderActiveSession();
                     updateNavRiwayatState();
-                    loadHistory(); // Langsung perbarui riwayat di tab belakang secara dinamis
+                    loadHistory(false); // Langsung perbarui riwayat di tab belakang secara dinamis
                 } else {
                     showCustomAlert("Aksi Gagal", result?.message || "Gagal menyimpan waktu presensi.", "warning");
                 }
@@ -752,7 +752,7 @@
 
         // ================= FUNGSI LOAD HISTORY =================
 
-        async function loadHistory() {
+        async function loadHistory(showSpinner = true) {
             // Tentukan nama pegawai yang sedang login/dipilih
             const employeeName = activeSession.active ? activeSession.nama : document.getElementById('nama').value;
             if (!employeeName) {
@@ -766,10 +766,10 @@
                 return;
             }
 
-            showLoader(true);
+            if (showSpinner) showLoader(true);
             try {
                 const result = await callAppsScript('getRecords', { nama: employeeName });
-                showLoader(false);
+                if (showSpinner) showLoader(false);
                 const list = document.getElementById('history-list');
 
                 if (!result || !result.success || !result.data) {
@@ -843,7 +843,7 @@
                     `;
                 });
             } catch (error) {
-                showLoader(false);
+                if (showSpinner) showLoader(false);
                 const list = document.getElementById('history-list');
                 list.innerHTML = `
                     <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
@@ -883,7 +883,7 @@
             // Redirect ke tab input secara aman
             switchTab('input', document.getElementById('btn-nav-input'));
             updateNavRiwayatState();
-            loadHistory(); // Reload riwayat akhir
+            loadHistory(false); // Reload riwayat akhir
         }
 
         // Render sesi aktif
