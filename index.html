@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SIKEMAS BPS Kalbar</title>
+    <!-- Google Fonts & Tailwind CSS & FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bpsBlue: '#005aa9',
+                        bpsOrange: '#f29400',
+                        slateBg: '#f8fafc',
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.35s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-overlay {
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            transform: scale(0.95);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-overlay.active .modal-card {
+            transform: scale(1);
+        }
+    </style>
+</head>
+
+<body class="bg-slateBg text-slate-800 min-h-screen pb-28">
+
+    <!-- Loading Spinner Overlay -->
+    <div id="loader"
+        class="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-[9999] hidden">
+        <div class="flex flex-col items-center gap-3">
+            <div class="w-12 h-12 border-4 border-slate-200 border-t-bpsBlue rounded-full animate-spin"></div>
+            <p class="text-sm font-semibold text-bpsBlue">Memproses data...</p>
+        </div>
+    </div>
+
+    <!-- Custom Alert Pop Up Modal -->
+    <div id="custom-alert"
+        class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-[3px] flex items-center justify-center p-4 z-[999]">
+        <div
+            class="modal-card bg-white w-full max-w-[360px] rounded-2xl p-6 shadow-2xl border border-slate-100 text-center">
+            <div id="modal-icon" class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+            </div>
+            <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-1">Pemberitahuan</h3>
+            <p id="modal-message" class="text-sm text-slate-500 leading-relaxed mb-5">Detail pesan pemberitahuan akan
+                tertera di sini.</p>
+            <button
+                class="w-full bg-bpsBlue text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-bpsBlue/20 hover:bg-opacity-90 active:scale-[0.98] transition-all text-sm"
+                onclick="closeCustomAlert()">OK</button>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation Pop Up Modal -->
+    <div id="custom-confirm"
+        class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-[3px] flex items-center justify-center p-4 z-[999]">
+        <div
+            class="modal-card bg-white w-full max-w-[360px] rounded-2xl p-6 shadow-2xl border border-slate-100 text-center">
+            <div
+                class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl bg-rose-50 text-rose-500">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Konfirmasi Reset</h3>
+            <p id="confirm-message" class="text-sm text-slate-500 leading-relaxed mb-5">Apakah Anda yakin ingin
+                melakukan tindakan ini?</p>
+            <div class="flex gap-3">
+                <button
+                    class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 px-4 rounded-xl hover:bg-slate-200 transition-all text-xs"
+                    onclick="closeCustomConfirm()">Batal</button>
+                <button id="btn-confirm-action"
+                    class="flex-1 bg-rose-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all text-xs"
+                    onclick="executeConfirmAction()">Ya, Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-bpsBlue text-white px-6 py-6 pb-8 text-center rounded-b-[24px] shadow-lg shadow-bpsBlue/10">
+        <h1 class="text-2xl font-extrabold tracking-wider">SIKEMAS</h1>
+        <p class="text-xs opacity-90 font-medium mt-1">Sistem Keterangan Keluar Masuk Pegawai</p>
+        <p class="text-[10px] opacity-75 mt-0.5">BPS Provinsi Kalimantan Barat</p>
+    </header>
+
+    <div class="max-w-[550px] mx-auto p-4 mt-2">
+
+        <!-- ================= TAB 1: INPUT ================= -->
+        <div id="tab-input" class="tab-content active space-y-4">
+
+            <!-- PANEL 1: FORM INPUT KETERANGAN (TAMPIL JIKA TIDAK ADA SESI AKTIF) -->
+            <div id="panel-form" class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 space-y-4">
+                <div class="border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <span class="w-2 h-5 bg-bpsOrange rounded-full"></span>
+                    <h2 class="font-bold text-slate-800 text-base">Buat Keterangan Kegiatan</h2>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-bpsBlue uppercase tracking-wider mb-1.5"><i
+                                class="fa-solid fa-user mr-1"></i> Nama Pegawai</label>
+                        <select id="nama"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-bpsBlue focus:ring-1 focus:ring-bpsBlue transition-all bg-white cursor-pointer">
+                            <option value="" disabled selected>Memuat daftar nama...</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-bpsBlue uppercase tracking-wider mb-1.5"><i
+                                    class="fa-solid fa-calendar-day mr-1"></i> Tanggal</label>
+                            <input type="date" id="tanggal" onchange="updateHari(this.value)"
+                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-bpsBlue focus:ring-1 focus:ring-bpsBlue transition-all">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-bpsBlue uppercase tracking-wider mb-1.5">Hari</label>
+                            <input type="text" id="hari" readonly
+                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-500 font-semibold cursor-not-allowed">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-bpsBlue uppercase tracking-wider mb-1.5"><i
+                                class="fa-solid fa-file-lines mr-1"></i> Keterangan / Keperluan Keluar</label>
+                        <textarea id="keterangan" rows="3"
+                            placeholder="Contoh: Dinas luar pengumpulan data ke Bappeda..."
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-bpsBlue focus:ring-1 focus:ring-bpsBlue transition-all resize-none"></textarea>
+                    </div>
+                </div>
+
+                <button
+                    class="w-full bg-bpsOrange text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-bpsOrange/20 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm mt-2"
+                    onclick="submitData()">
+                    <i class="fa-solid fa-paper-plane text-xs"></i> SIMPAN RENCANA KEGIATAN
+                </button>
+            </div>
+
+            <!-- PANEL 2: PANEL SESI AKTIF (INTERAKTIF PRESENSI) -->
+            <div id="panel-session" class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 space-y-4 hidden">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-5 bg-bpsBlue rounded-full"></span>
+                        <h2 class="font-bold text-slate-800 text-base">Presensi Waktu Aktif</h2>
+                    </div>
+                    <span id="session-badge"
+                        class="px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide flex items-center gap-1">
+                        <i class="fa-solid fa-circle text-[6px]"></i> <span>Menunggu Keluar</span>
+                    </span>
+                </div>
+
+                <!-- Detail Kegiatan Aktif -->
+                <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 id="session-name" class="font-bold text-slate-800 text-sm">-</h4>
+                            <p id="session-meta" class="text-[11px] text-slate-500 mt-0.5 font-medium">-</p>
+                        </div>
+                        <button id="btn-reset-session"
+                            class="text-xs font-bold text-red-500 hover:text-red-600 flex items-center gap-1 active:scale-95 transition-all"
+                            onclick="confirmResetSession()">
+                            <i class="fa-solid fa-rotate-left"></i> Reset Sesi
+                        </button>
+                    </div>
+                    <div class="border-t border-slate-200/50 pt-2 mt-1">
+                        <p class="text-[11px] font-semibold text-bpsBlue uppercase tracking-wider">Keterangan Kepergian:
+                        </p>
+                        <p id="session-desc" class="text-xs text-slate-600 mt-0.5 leading-relaxed italic">"-"</p>
+                    </div>
+                </div>
+
+                <!-- Interactive Capture Grid -->
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <!-- Tombol Jam Keluar -->
+                    <button id="btn-session-keluar"
+                        class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 rounded-2xl transition-all duration-300 group"
+                        onclick="sessionCaptureTime('keluar')">
+                        <div
+                            class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-right-from-bracket text-bpsOrange text-base"></i>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jam Keluar</span>
+                        <span id="session-val-keluar" class="text-lg font-extrabold text-slate-700 mt-1">--:--</span>
+                    </button>
+
+                    <!-- Tombol Jam Kembali -->
+                    <button id="btn-session-kembali"
+                        class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 rounded-2xl transition-all duration-300 group"
+                        onclick="sessionCaptureTime('kembali')">
+                        <div
+                            class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-right-to-bracket text-bpsBlue text-base"></i>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jam Kembali</span>
+                        <span id="session-val-kembali" class="text-lg font-extrabold text-slate-700 mt-1">--:--</span>
+                    </button>
+                </div>
+
+                <!-- Tombol Selesai (Hanya muncul jika selesai semua) -->
+                <button id="btn-session-complete"
+                    class="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-xs hidden"
+                    onclick="completeAndClearSession()">
+                    <i class="fa-solid fa-circle-check"></i> SELESAI & BUAT KETERANGAN BARU
+                </button>
+            </div>
+            <script>
+                // Mencegah visual flicker secara instan sebelum seluruh DOM selesai dimuat
+                (function() {
+                    const data = localStorage.getItem('sikemas_session');
+                    if (data) {
+                        try {
+                            const session = JSON.parse(data);
+                            if (session && session.active) {
+                                document.getElementById('panel-form').style.display = 'none';
+                                document.getElementById('panel-session').classList.remove('hidden');
+                            }
+                        } catch(e) {}
+                    }
+                })();
+            </script>
+        </div>
+
+        <!-- ================= TAB 2: RIWAYAT ================= -->
+        <div id="tab-riwayat" class="tab-content space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <span class="text-xs font-bold text-slate-500 tracking-wider uppercase"><i
+                        class="fa-solid fa-history mr-1"></i> Log Riwayat Pegawai</span>
+                <button class="text-xs font-bold text-bpsBlue hover:underline flex items-center gap-1 active:scale-95"
+                    onclick="loadHistory()">
+                    <i class="fa-solid fa-rotate-right"></i> Perbarui Riwayat
+                </button>
+            </div>
+            <div id="history-list" class="space-y-3">
+                <!-- Log riwayat akan dimuat secara dinamis -->
+            </div>
+        </div>
+
+        <!-- ================= TAB 3: PANDUAN ================= -->
+        <div id="tab-panduan" class="tab-content">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-5">
+                <div class="border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <span class="w-2 h-5 bg-bpsBlue rounded-full"></span>
+                    <h2 class="font-bold text-slate-800 text-base">Panduan Penggunaan</h2>
+                </div>
+
+                <div class="space-y-4 text-xs leading-relaxed text-slate-600">
+                    <div>
+                        <h4 class="font-bold text-bpsBlue text-sm mb-1">1. Buat Rencana Kegiatan</h4>
+                        <p>Pilih Nama Anda dari daftar dropdown, tentukan tanggal keluar, dan isi keterangan keperluan
+                            dengan jelas. Lalu klik tombol <b class="text-bpsOrange">Simpan Rencana Kegiatan</b>.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-bpsBlue text-sm mb-1">2. Presensi Jam Keluar (Keberangkatan)</h4>
+                        <p>Setelah rencana tersimpan, panel presensi aktif akan muncul. Saat Anda siap meninggalkan
+                            kantor, klik kotak <b class="text-bpsOrange">Jam Keluar</b> untuk mencatat waktu
+                            keberangkatan Anda.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-bpsBlue text-sm mb-1">3. Presensi Jam Kembali (Kepulangan)</h4>
+                        <p>Setibanya kembali di kantor, buka kembali SIKEMAS (sesi Anda akan otomatis dipulihkan) lalu
+                            klik kotak <b class="text-bpsBlue">Jam Kembali</b> untuk mengakhiri kegiatan.</p>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200/50 p-3 rounded-xl">
+                        <p class="font-semibold text-slate-700 mb-0.5"><i
+                                class="fa-solid fa-info-circle text-bpsBlue"></i> Tips Sesi</p>
+                        <p>Anda dapat menutup tab browser setelah melakukan presensi keluar. Sesi aktif Anda tidak akan
+                            hilang dari perangkat saat Anda membukanya kembali nanti!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center py-8 text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-1">
+            <p>SIKEMAS BPS PROVINSI KALIMANTAN BARAT</p>
+            <p>Copyright &copy; 2026 Tim Umum dan Humas</p>
+        </footer>
+    </div>
+
+    <!-- Bottom Navbar Navigation -->
+    <div
+        class="fixed bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md border border-slate-100 py-3 px-2 rounded-2xl shadow-[0_-5px_25px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.06)] flex justify-around items-center z-50">
+        <button id="btn-nav-input" onclick="switchTab('input', this)"
+            class="nav-item flex flex-col items-center gap-1 flex-1 text-bpsBlue">
+            <i class="fa-solid fa-pen-to-square text-lg"></i>
+            <span class="text-[9px] font-bold tracking-wider">INPUT</span>
+        </button>
+        <button id="btn-nav-riwayat" onclick="switchTab('riwayat', this)"
+            class="nav-item flex flex-col items-center gap-1 flex-1 text-slate-400">
+            <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+            <span class="text-[9px] font-bold tracking-wider">RIWAYAT</span>
+        </button>
+        <button id="btn-nav-panduan" onclick="switchTab('panduan', this)"
+            class="nav-item flex flex-col items-center gap-1 flex-1 text-slate-400">
+            <i class="fa-solid fa-circle-info text-lg"></i>
+            <span class="text-[9px] font-bold tracking-wider">PANDUAN</span>
+        </button>
+    </div>
+
+<script>
+        // State Manajemen Sesi Aktif
+        let activeSession = {
+            active: false,
+            rowIndex: null,
+            sessionId: "", // Menampung ID unik sesi
+            nama: "",
+            tanggal: "",
+            hari: "",
+            keterangan: "",
+            waktuKeluar: "-",
+            waktuKembali: "-",
+            status: "menunggu_keluar" // menunggu_keluar, sedang_keluar, sudah_kembali
+        };
+
+        let confirmCallback = null; // Menyimpan callback fungsi konfirmasi popup
+
+        // Inisialisasi awal saat halaman termuat
+        window.onload = function () {
+            initDate();
+            loadActiveSession(); // Pulihkan sesi dari LocalStorage jika ada
+            loadEmployeeDropdown(); // Mengambil nama-nama dari sheet 'User' untuk dropdown
+            
+            // Sync status sesi teraktif secara real-time di background jika ada sesi aktif
+            if (activeSession.active) {
+                syncSessionWithServer();
+            }
+            
+            // Perbarui status tampilan tombol riwayat di navbar
+            updateNavRiwayatState();
+            loadHistory(); // Pre-load riwayat
+        }
+
+        // Memperbarui tampilan menu nav Riwayat (disable/dimmed jika belum mencatat jam keluar)
+        function updateNavRiwayatState() {
+            const btnRiwayat = document.getElementById('btn-nav-riwayat');
+            const canAccess = activeSession.active && 
+                               activeSession.waktuKeluar !== "-" && 
+                               (activeSession.status === 'sedang_keluar' || activeSession.status === 'sudah_kembali');
+            
+            if (canAccess) {
+                btnRiwayat.classList.remove('opacity-40');
+                btnRiwayat.style.cursor = 'pointer';
+            } else {
+                btnRiwayat.classList.add('opacity-40');
+                btnRiwayat.style.cursor = 'not-allowed';
+            }
+        }
+
+        // Fungsi Tab Switching
+        function switchTab(tabId, el) {
+            // Cek akses khusus untuk Tab Riwayat
+            if (tabId === 'riwayat') {
+                const canAccess = activeSession.active && 
+                                   activeSession.waktuKeluar !== "-" && 
+                                   (activeSession.status === 'sedang_keluar' || activeSession.status === 'sudah_kembali');
+                if (!canAccess) {
+                    showCustomAlert("Akses Terbatas", "Menu Riwayat hanya dapat diakses setelah pegawai mencatat Jam Keluar.", "warning");
+                    return;
+                }
+            }
+
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                btn.classList.remove('text-bpsBlue');
+                btn.classList.add('text-slate-400');
+            });
+            el.classList.remove('text-slate-400');
+            el.classList.add('text-bpsBlue');
+
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+
+            if (tabId === 'riwayat') loadHistory();
+        }
+
+        // Kalkulasi Hari Otomatis
+        function updateHari(val) {
+            if (!val) {
+                document.getElementById('hari').value = "";
+                return;
+            }
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const d = new Date(val);
+            document.getElementById('hari').value = days[d.getDay()];
+        }
+
+        // Mencegah error / timezone mismatch dengan menggunakan format hari dari tanggal input
+        function initDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('tanggal').value = today;
+            updateHari(today);
+        }
+
+        // Mengaktifkan loading spinner
+        function showLoader(s) {
+            document.getElementById('loader').classList.toggle('hidden', !s);
+        }
+
+        // Custom Popup Alert Modal Dialog
+        function showCustomAlert(title, message, type = 'success') {
+            const modal = document.getElementById('custom-alert');
+            const titleEl = document.getElementById('modal-title');
+            const messageEl = document.getElementById('modal-message');
+            const iconEl = document.getElementById('modal-icon');
+
+            titleEl.innerText = title;
+            messageEl.innerText = message;
+
+            if (type === 'success') {
+                iconEl.className = 'w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl bg-emerald-50 text-emerald-500';
+                iconEl.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            } else if (type === 'warning') {
+                iconEl.className = 'w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl bg-amber-50 text-amber-500';
+                iconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            } else if (type === 'error') {
+                iconEl.className = 'w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl bg-rose-50 text-rose-500';
+                iconEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+            }
+
+            modal.classList.add('active');
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('custom-alert').classList.remove('active');
+        }
+
+        // Custom Confirmation Popup Modal Dialog
+        function showCustomConfirm(message, onConfirm) {
+            const modal = document.getElementById('custom-confirm');
+            document.getElementById('confirm-message').innerText = message;
+            confirmCallback = onConfirm;
+            modal.classList.add('active');
+        }
+
+        function closeCustomConfirm() {
+            const modal = document.getElementById('custom-confirm');
+            modal.classList.remove('active');
+            confirmCallback = null;
+        }
+
+        function executeConfirmAction() {
+            if (confirmCallback) confirmCallback();
+            closeCustomConfirm();
+        }
+
+        // Memanggil daftar nama dari Google Sheets dan memasukkannya ke elemen select (dropdown)
+        // Dibuat lebih aman dengan melestarikan nama terpilih jika browser direfresh
+        function loadEmployeeDropdown() {
+            google.script.run
+                .withSuccessHandler(names => {
+                    const select = document.getElementById('nama');
+                    select.innerHTML = '<option value="" disabled selected>Pilih nama Anda...</option>';
+                    if (names && names.length > 0) {
+                        names.forEach(name => {
+                            const option = document.createElement('option');
+                            option.value = name;
+                            option.textContent = name;
+                            select.appendChild(option);
+                        });
+
+                        // Set nilai ke nama yang aktif di sesi jika ada sesi berjalan
+                        if (activeSession && activeSession.active) {
+                            select.value = activeSession.nama;
+                        }
+                    } else {
+                        select.innerHTML = '<option value="" disabled selected>Daftar pegawai kosong (Sheet User)</option>';
+                    }
+                })
+                .withFailureHandler(err => {
+                    const select = document.getElementById('nama');
+                    select.innerHTML = '<option value="" disabled selected>Gagal memuat nama</option>';
+                    showCustomAlert("Dropdown Error", "Gagal memuat daftar pegawai dari Sheet 'User'.", "error");
+                })
+                .getEmployeeNames();
+        }
+
+        // ================= LOGIKA SESI DAN AKSI PRESENSI =================
+
+        // Menyimpan rencana kegiatan awal
+        function submitData() {
+            const namaSelect = document.getElementById('nama');
+            const nama = namaSelect.value;
+            const tgl = document.getElementById('tanggal').value;
+            const hari = document.getElementById('hari').value;
+            const ket = document.getElementById('keterangan').value.trim();
+
+            if (!nama) {
+                showCustomAlert("Form Belum Lengkap", "Silakan pilih Nama Pegawai dari daftar terlebih dahulu.", "warning");
+                return;
+            }
+            if (!tgl || !ket) {
+                showCustomAlert("Form Belum Lengkap", "Silakan lengkapi Tanggal dan Keterangan Keperluan sebelum menyimpan.", "warning");
+                return;
+            }
+
+            showLoader(true);
+            const payload = {
+                nama: nama,
+                tanggal: tgl,
+                hari: hari,
+                waktuKeluar: "-",
+                waktuKembali: "-",
+                keterangan: ket
+            };
+
+            google.script.run
+                .withSuccessHandler(res => {
+                    showLoader(false);
+                    if (res.success) {
+                        // Daftarkan Sesi Aktif Baru
+                        activeSession = {
+                            active: true,
+                            rowIndex: res.rowIndex,
+                            sessionId: res.sessionId, // Simpan Session ID dari server
+                            nama: nama,
+                            tanggal: formatDateStr(tgl),
+                            hari: hari,
+                            keterangan: ket,
+                            waktuKeluar: "-",
+                            waktuKembali: "-",
+                            status: "menunggu_keluar"
+                        };
+                        saveSessionToStorage();
+                        renderActiveSession();
+                        updateNavRiwayatState();
+                        loadHistory(); // Langsung perbarui riwayat setelah menyimpan data keterangan
+                        showCustomAlert("Berhasil Tersimpan", res.message, "success");
+                    } else {
+                        showCustomAlert("Gagal", res.message, "error");
+                    }
+                })
+                .withFailureHandler(err => {
+                    showLoader(false);
+                    showCustomAlert("Koneksi Gagal", "Gagal menghubungi server: " + err.toString(), "error");
+                })
+                .saveRecord(payload);
+        }
+
+        // Presensi Jam Keluar / Jam Kembali secara instant
+        function sessionCaptureTime(type) {
+            // Validasi urutan aksi tombol
+            if (type === 'kembali' && activeSession.status === 'menunggu_keluar') {
+                showCustomAlert("Belum Diperbolehkan", "Anda harus mencatat Jam Keluar terlebih dahulu.", "warning");
+                return;
+            }
+
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ":" +
+                now.getMinutes().toString().padStart(2, '0');
+
+            showLoader(true);
+            google.script.run
+                .withSuccessHandler(res => {
+                    showLoader(false);
+                    if (res.success) {
+                        if (type === 'keluar') {
+                            activeSession.waktuKeluar = timeStr;
+                            activeSession.status = "sedang_keluar";
+                            showCustomAlert("Jam Keluar Dicatat", `Selamat jalan, silakan bertugas dengan lancar. Jam keberangkatan Anda: ${timeStr}`, "success");
+                        } else if (type === 'kembali') {
+                            activeSession.waktuKembali = timeStr;
+                            activeSession.status = "sudah_kembali";
+                            showCustomAlert("Selesai Lengkap", "Data keterangan kegiatan Anda telah tersimpan lengkap. Selamat datang kembali di kantor!", "success");
+                        }
+                        saveSessionToStorage();
+                        renderActiveSession();
+                        updateNavRiwayatState();
+                        loadHistory(); // Langsung perbarui riwayat di tab belakang secara dinamis
+                    } else {
+                        showCustomAlert("Aksi Gagal", res.message, "warning");
+                    }
+                })
+                .withFailureHandler(err => {
+                    showLoader(false);
+                    showCustomAlert("Koneksi Gagal", "Gagal menyimpan waktu presensi: " + err.toString(), "error");
+                })
+                .updateTimeSafe(activeSession.sessionId, activeSession.nama, type, timeStr);
+        }
+
+        // Sinkronisasi status, warna, dan fungsionalitas tombol sesi aktif
+        function renderActiveSession() {
+            const formPanel = document.getElementById('panel-form');
+            const sessionPanel = document.getElementById('panel-session');
+
+            if (!activeSession.active) {
+                // Bersihkan inline style anti-flicker
+                formPanel.style.display = '';
+                formPanel.classList.remove('hidden');
+                sessionPanel.classList.add('hidden');
+                return;
+            }
+
+            // Transisi Tampilan Panel
+            formPanel.style.display = 'none';
+            formPanel.classList.add('hidden');
+            sessionPanel.classList.remove('hidden');
+
+            // Set Data Teks
+            document.getElementById('session-name').innerText = activeSession.nama;
+            document.getElementById('session-meta').innerText = `${activeSession.hari}, ${activeSession.tanggal}`;
+            document.getElementById('session-desc').innerText = `"${activeSession.keterangan}"`;
+            document.getElementById('session-val-keluar').innerText = activeSession.waktuKeluar;
+            document.getElementById('session-val-kembali').innerText = activeSession.waktuKembali;
+
+            // Element Interface tombol
+            const btnKeluar = document.getElementById('btn-session-keluar');
+            const btnKembali = document.getElementById('btn-session-kembali');
+            const btnComplete = document.getElementById('btn-session-complete');
+            const btnReset = document.getElementById('btn-reset-session');
+            const badge = document.getElementById('session-badge');
+
+            // Reset Kelas Dasar Tombol
+            btnKeluar.className = "flex flex-col items-center justify-center p-4 border-2 rounded-2xl transition-all duration-300";
+            btnKembali.className = "flex flex-col items-center justify-center p-4 border-2 rounded-2xl transition-all duration-300";
+            btnComplete.classList.add('hidden');
+            btnReset.classList.remove('hidden');
+
+            // Logika State Rendering
+            if (activeSession.status === "menunggu_keluar") {
+                // Status Badge
+                badge.className = "px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-200";
+                badge.innerHTML = '<i class="fa-solid fa-hourglass-start animate-pulse"></i> Menunggu Keluar';
+
+                // Tombol Keluar Aktif
+                btnKeluar.className += ' border-bpsOrange bg-white text-slate-800 cursor-pointer shadow-md shadow-bpsOrange/5 hover:border-bpsOrange active:scale-95';
+                btnKeluar.disabled = false;
+
+                // Tombol Kembali Non-Aktif
+                btnKembali.className += ' border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed';
+                btnKembali.disabled = true;
+
+                // Reset Sesi Aktif
+                btnReset.classList.remove('hidden');
+
+            } else if (activeSession.status === "sedang_keluar") {
+                // Status Badge
+                badge.className = "px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200";
+                badge.innerHTML = '<i class="fa-solid fa-person-walking-arrow-right animate-pulse"></i> Sedang Keluar';
+
+                // Tombol Keluar Disabled (Selesai)
+                btnKeluar.className += ' border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed';
+                btnKeluar.disabled = true;
+
+                // Tombol Kembali Aktif
+                btnKembali.className += ' border-bpsBlue bg-white text-slate-800 cursor-pointer shadow-md shadow-bpsBlue/5 hover:border-bpsBlue active:scale-95';
+                btnKembali.disabled = false;
+
+                // Sembunyikan Tombol Reset (Ketentuan 2.3)
+                btnReset.classList.add('hidden');
+
+            } else if (activeSession.status === "sudah_kembali") {
+                // Status Badge
+                badge.className = "px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide flex items-center gap-1 bg-emerald-100 text-emerald-700 border border-emerald-200";
+                badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Sudah Kembali';
+
+                // Semua Tombol Disabled
+                btnKeluar.className += ' border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed';
+                btnKeluar.disabled = true;
+                btnKembali.className += ' border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed';
+                btnKembali.disabled = true;
+
+                // Sembunyikan Tombol Reset (Ketentuan 2.3)
+                btnReset.classList.add('hidden');
+
+                // Munculkan Tombol Selesai untuk beralih kembali ke form awal
+                btnComplete.classList.remove('hidden');
+            }
+        }
+
+        // Selesaikan Sesi, bersihkan penyimpanan, dan buka kembali Form Input
+        function completeAndClearSession() {
+            activeSession = {
+                active: false,
+                rowIndex: null,
+                sessionId: "",
+                nama: "",
+                tanggal: "",
+                hari: "",
+                keterangan: "",
+                waktuKeluar: "-",
+                waktuKembali: "-",
+                status: "menunggu_keluar"
+            };
+            localStorage.removeItem('sikemas_session');
+            document.getElementById('keterangan').value = "";
+
+            // Atur ulang dropdown ke opsi default
+            document.getElementById('nama').value = "";
+
+            renderActiveSession();
+            initDate();
+            
+            // Redirect ke tab input secara aman
+            switchTab('input', document.getElementById('btn-nav-input'));
+            updateNavRiwayatState();
+            loadHistory(); // Reload riwayat akhir
+        }
+
+        // Fungsi Reset Sesi beserta penghapusan baris data bersangkutan di database Google Sheets secara aman
+        function resetSessionOnServer() {
+            showLoader(true);
+            google.script.run
+                .withSuccessHandler(res => {
+                    showLoader(false);
+                    if (res.success) {
+                        completeAndClearSession(); // Bersihkan UI dan LocalStorage
+                        showCustomAlert("Sesi Dibatalkan", res.message, "success");
+                    } else {
+                        showCustomAlert("Gagal Reset", res.message, "error");
+                    }
+                })
+                .withFailureHandler(err => {
+                    showLoader(false);
+                    showCustomAlert("Koneksi Gagal", "Gagal menghubungi server untuk menghapus rencana kegiatan: " + err.toString(), "error");
+                })
+                .deleteRecordSafe(activeSession.sessionId, activeSession.nama);
+        }
+
+        // Konfirmasi reset paksa menggunakan custom pop up confirm (bukan window.confirm)
+        function confirmResetSession() {
+            showCustomConfirm(
+                "Apakah Anda yakin ingin me-reset sesi presensi aktif ini? Sesi Anda beserta data rencana kegiatan ini akan sepenuhnya terhapus dari database SIKEMAS.",
+                function () {
+                    resetSessionOnServer();
+                }
+            );
+        }
+
+        // Sinkronisasi status sesi aktif di server saat aplikasi dibuka/direfresh (pencegah inkonsistensi)
+        function syncSessionWithServer() {
+            if (!activeSession.active || !activeSession.nama) return;
+            
+            google.script.run
+                .withSuccessHandler(res => {
+                    if (res && res.found) {
+                        // Sinkronisasi data mutakhir dari server spreadsheet
+                        activeSession.waktuKeluar = res.waktuKeluar;
+                        activeSession.waktuKembali = res.waktuKembali;
+                        
+                        if (res.waktuKembali !== "-") {
+                            activeSession.status = "sudah_kembali";
+                        } else if (res.waktuKeluar !== "-") {
+                            activeSession.status = "sedang_keluar";
+                        } else {
+                            activeSession.status = "menunggu_keluar";
+                        }
+                        
+                        saveSessionToStorage();
+                        renderActiveSession();
+                        updateNavRiwayatState();
+                    } else {
+                        // Jika sesi tidak ditemukan di database server (misal dihapus admin), hapus lokal
+                        completeAndClearSession();
+                    }
+                })
+                .withFailureHandler(err => {
+                    console.log("Failed to sync session with server: " + err.toString());
+                })
+                .checkSessionActive(activeSession.sessionId, activeSession.nama);
+        }
+
+        // Helper Penyimpanan Lokal (Local Storage)
+        function saveSessionToStorage() {
+            localStorage.setItem('sikemas_session', JSON.stringify(activeSession));
+        }
+
+        function loadActiveSession() {
+            const data = localStorage.getItem('sikemas_session');
+            if (data) {
+                activeSession = JSON.parse(data);
+                renderActiveSession();
+            }
+        }
+
+        // Format Date string dari YYYY-MM-DD ke DD-MM-YYYY
+        function formatDateStr(dateStr) {
+            if (!dateStr) return "";
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            return dateStr;
+        }
+
+        // Helper untuk membersihkan & memformat string waktu dari Google Sheet agar aman dan konsisten
+        function sanitizeTime(val) {
+            if (!val || val === "-") return "-";
+            if (typeof val === 'string' && val.includes('T') && val.includes('-')) {
+                try {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) {
+                        const hours = d.getHours().toString().padStart(2, '0');
+                        const mins = d.getMinutes().toString().padStart(2, '0');
+                        return `${hours}:${mins}`;
+                    }
+                } catch (e) { }
+            }
+            return val;
+        }
+
+        // ================= LOADING RIWAYAT DARI SPREADSHEET =================
+
+        function loadHistory() {
+            // Tentukan nama pegawai yang sedang login/dipilih
+            const employeeName = activeSession.active ? activeSession.nama : document.getElementById('nama').value;
+            if (!employeeName) {
+                const list = document.getElementById('history-list');
+                list.innerHTML = `
+                    <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                        <i class="fa-solid fa-user-slash text-4xl mb-2 text-slate-200 block"></i>
+                        <span class="text-xs font-semibold">Pilih Nama Pegawai terlebih dahulu untuk melihat riwayat.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            showLoader(true);
+            google.script.run
+                .withSuccessHandler(data => {
+                    showLoader(false);
+                    const list = document.getElementById('history-list');
+
+                    if (!data || !Array.isArray(data)) {
+                        list.innerHTML = `
+                            <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                                <i class="fa-solid fa-circle-exclamation text-4xl mb-2 text-rose-300 block"></i>
+                                <span class="text-xs font-semibold">Format data tidak sesuai atau gagal memproses database. Silakan segarkan halaman.</span>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    list.innerHTML = data.length ? "" : `
+                        <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                            <i class="fa-solid fa-folder-open text-4xl mb-2 text-slate-200 block"></i>
+                            <span class="text-xs font-semibold">Belum ada riwayat aktivitas yang tercatat.</span>
+                        </div>
+                    `;
+
+                    data.forEach(r => {
+                        const sanitizedKeluar = sanitizeTime(r.waktuKeluar);
+                        const sanitizedKembali = sanitizeTime(r.waktuKembali);
+
+                        // Desain visual badge di list riwayat
+                        let timeBadge = '';
+                        if (sanitizedKeluar !== "-" && sanitizedKembali !== "-") {
+                            timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 font-bold border border-emerald-100/80 flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Selesai</span>';
+                        } else if (sanitizedKeluar !== "-") {
+                            timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 font-bold border border-blue-100/80 flex items-center gap-1"><i class="fa-solid fa-person-walking animate-pulse"></i> Sedang Keluar</span>';
+                        } else {
+                            timeBadge = '<span class="text-[10px] px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 font-bold border border-amber-100/80 flex items-center gap-1"><i class="fa-solid fa-clock"></i> Terdaftar</span>';
+                        }
+
+                        list.innerHTML += `
+                            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="font-extrabold text-slate-800 text-sm tracking-wide">${r.nama}</h3>
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">${r.hari}, ${r.tanggal}</p>
+                                    </div>
+                                    ${timeBadge}
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-6 h-6 rounded-full bg-amber-100/70 flex items-center justify-center text-bpsOrange text-[10px]">
+                                            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-[9px] text-slate-400 block font-bold uppercase">Keluar</span>
+                                            <span class="font-bold text-slate-700">${sanitizedKeluar}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-6 h-6 rounded-full bg-blue-100/70 flex items-center justify-center text-bpsBlue text-[10px]">
+                                            <i class="fa-solid fa-arrow-down-to-bracket"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-[9px] text-slate-400 block font-bold uppercase">Kembali</span>
+                                            <span class="font-bold text-slate-700">${sanitizedKembali}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="border-t border-slate-100/80 pt-2.5">
+                                    <span class="text-[9px] font-bold text-bpsBlue uppercase tracking-wider block mb-0.5">Keperluan:</span>
+                                    <p class="text-xs text-slate-600 italic leading-relaxed">"${r.keterangan}"</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                })
+                .withFailureHandler(err => {
+                    showLoader(false);
+                    const list = document.getElementById('history-list');
+                    list.innerHTML = `
+                        <div class="bg-white rounded-2xl p-8 border border-slate-100 text-center text-slate-400">
+                            <i class="fa-solid fa-circle-exclamation text-4xl mb-2 text-rose-300 block"></i>
+                            <span class="text-xs font-semibold">Gagal memuat database riwayat: ${err.toString()}</span>
+                        </div>
+                    `;
+                })
+                .getRecords(employeeName); // Kirim parameter nama ke server
+        }
+    </script>
