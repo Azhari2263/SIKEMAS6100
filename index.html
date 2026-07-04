@@ -495,90 +495,46 @@
 
         // ================= FUNGSI API CALL =================
         
-        // Fungsi untuk memanggil Google Apps Script dengan fetch
+        // Fungsi untuk memanggil Google Apps Script dengan fetch atau google.script.run
         async function callAppsScript(action, data = {}) {
+            // 1. Jika berjalan di dalam lingkungan Google Apps Script Web App, gunakan google.script.run
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                return new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(error => {
+                            console.error(`Apps Script error on ${action}:`, error);
+                            reject(error);
+                        })
+                        [action](data);
+                });
+            }
+            
+            // 2. Jika dijalankan secara lokal/eksternal, lakukan fetch ke SCRIPT_URL
             try {
                 const payload = {
                     action: action,
                     ...data
                 };
                 
+                // Menggunakan Content-Type: text/plain untuk menghindari CORS preflight OPTIONS request
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'text/plain'
                     },
                     body: JSON.stringify(payload)
                 });
                 
-                // Karena mode: 'no-cors', response tidak bisa dibaca
-                // Kita perlu menggunakan pendekatan alternatif dengan JSONP atau redirect
-                // Untuk solusi sementara, kita akan menggunakan pendekatan dengan iframe
-                return await handleResponseWithIframe(action, payload);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
             } catch (error) {
-                console.error('Error calling Apps Script:', error);
+                console.error('Error calling Apps Script via fetch:', error);
                 throw error;
             }
-        }
-
-        // Pendekatan alternatif menggunakan iframe untuk komunikasi
-        function handleResponseWithIframe(action, payload) {
-            return new Promise((resolve, reject) => {
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                
-                // Buat form untuk submit data
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = SCRIPT_URL;
-                form.target = 'appsScriptFrame';
-                
-                // Tambahkan data ke form
-                const dataInput = document.createElement('input');
-                dataInput.type = 'hidden';
-                dataInput.name = 'data';
-                dataInput.value = JSON.stringify(payload);
-                form.appendChild(dataInput);
-                
-                // Tambahkan callback untuk hasil
-                window.appsScriptCallback = function(result) {
-                    document.body.removeChild(iframe);
-                    delete window.appsScriptCallback;
-                    try {
-                        const parsed = typeof result === 'string' ? JSON.parse(result) : result;
-                        resolve(parsed);
-                    } catch (e) {
-                        resolve(result);
-                    }
-                };
-                
-                // Tambahkan event listener untuk pesan dari iframe
-                const messageHandler = function(event) {
-                    if (event.data && event.data.type === 'appsScriptResult') {
-                        window.removeEventListener('message', messageHandler);
-                        window.appsScriptCallback(event.data.result);
-                    }
-                };
-                window.addEventListener('message', messageHandler);
-                
-                // Append iframe dan form ke body
-                iframe.name = 'appsScriptFrame';
-                document.body.appendChild(iframe);
-                document.body.appendChild(form);
-                form.submit();
-                
-                // Timeout untuk menghindari hang
-                setTimeout(() => {
-                    if (document.body.contains(iframe)) {
-                        document.body.removeChild(iframe);
-                    }
-                    if (document.body.contains(form)) {
-                        document.body.removeChild(form);
-                    }
-                    reject(new Error('Request timeout'));
-                }, 30000);
-            });
         }
 
         // ================= FUNGSI UNTUK DROPDOWN =================

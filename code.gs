@@ -59,7 +59,7 @@ function getEmployeeNames() {
       }
     }
     
-    if (!doc) return [];
+    if (!doc) return { success: true, data: [] };
 
     let sheet = doc.getSheetByName("User");
     if (!sheet) {
@@ -72,17 +72,19 @@ function getEmployeeNames() {
     }
 
     const lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return [];
+    if (lastRow <= 1) return { success: true, data: [] };
 
     const range = sheet.getRange(2, 1, lastRow - 1, 1);
     const values = range.getValues();
 
-    return values
+    const names = values
       .map(row => String(row[0]).trim())
       .filter(name => name.length > 0);
+      
+    return { success: true, data: names };
   } catch (error) {
     Logger.log("Error getEmployeeNames: " + error.toString());
-    return [];
+    return { success: false, message: error.toString(), data: [] };
   }
 }
 
@@ -208,7 +210,7 @@ function checkSessionActive(sessionId, employeeName) {
 }
 
 // Mengambil riwayat khusus pegawai tertentu (terisolasi) dengan konversi string aman
-function getRecords(employeeName) {
+function getRecordsInternal(employeeName) {
   try {
     if (!employeeName) return [];
     const sheet = getSheet();
@@ -257,4 +259,116 @@ function getRecords(employeeName) {
   } catch (error) { 
     return []; 
   }
+}
+
+// Wrapper API untuk dipanggil dari client side (index.html)
+
+function getRecords(data) {
+  let employeeName = "";
+  if (data && typeof data === 'object') {
+    employeeName = data.nama;
+  } else if (typeof data === 'string') {
+    employeeName = data;
+  }
+  try {
+    const records = getRecordsInternal(employeeName);
+    return { success: true, data: records };
+  } catch (e) {
+    return { success: false, message: e.toString(), data: [] };
+  }
+}
+
+function updateTime(data) {
+  try {
+    const sessionId = data.sessionId;
+    const employeeName = data.nama;
+    const type = data.type;
+    const waktu = data.time;
+    return updateTimeSafe(sessionId, employeeName, type, waktu);
+  } catch (error) {
+    return { success: false, message: "Gagal memperbarui waktu: " + error.toString() };
+  }
+}
+
+function deleteRecord(data) {
+  try {
+    const sessionId = data.sessionId;
+    const employeeName = data.nama;
+    return deleteRecordSafe(sessionId, employeeName);
+  } catch (error) {
+    return { success: false, message: "Gagal menghapus data: " + error.toString() };
+  }
+}
+
+function checkSession(data) {
+  try {
+    const sessionId = data.sessionId;
+    const employeeName = data.nama;
+    return checkSessionActive(sessionId, employeeName);
+  } catch (error) {
+    return { found: false, error: error.toString() };
+  }
+}
+
+// Handler request HTTP POST (CORS-compliant) untuk pengujian lokal/eksternal
+function doPost(e) {
+  let requestData;
+  try {
+    if (e && e.postData && e.postData.contents) {
+      const contents = e.postData.contents;
+      try {
+        requestData = JSON.parse(contents);
+      } catch (err) {
+        if (e.parameter && e.parameter.data) {
+          requestData = JSON.parse(e.parameter.data);
+        } else {
+          requestData = e.parameter;
+        }
+      }
+    } else if (e && e.parameter && e.parameter.data) {
+      requestData = JSON.parse(e.parameter.data);
+    } else if (e && e.parameter) {
+      requestData = e.parameter;
+    } else {
+      requestData = {};
+    }
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      message: "Gagal memproses request payload: " + err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const action = requestData.action;
+  let result;
+
+  try {
+    switch (action) {
+      case 'getEmployeeNames':
+        result = getEmployeeNames();
+        break;
+      case 'saveRecord':
+        result = saveRecord(requestData);
+        break;
+      case 'updateTime':
+        result = updateTime(requestData);
+        break;
+      case 'deleteRecord':
+        result = deleteRecord(requestData);
+        break;
+      case 'checkSession':
+        result = checkSession(requestData);
+        break;
+      case 'getRecords':
+        result = getRecords(requestData);
+        break;
+      default:
+        result = { success: false, message: "Aksi tidak dikenal: " + action };
+    }
+  } catch (err) {
+    result = { success: false, message: "Terjadi kesalahan di server: " + err.toString() };
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
 }
