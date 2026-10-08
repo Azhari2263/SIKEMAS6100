@@ -1,0 +1,62 @@
+{
+  "id": "/",
+  "name": "SIKEMAS BPS Kalbar",
+  "short_name": "SIKEMAS",
+  "description": "Sistem Keterangan Keluar Masuk Pegawai BPS Provinsi Kalimantan Barat",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#005aa9",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Input Keterangan",
+      "short_name": "Input",
+      "description": "Buat rencana kegiatan keluar kantor",
+      "url": "/#input",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Riwayat Aktivitas",
+      "short_name": "Riwayat",
+      "description": "Lihat catatan presensi pegawai",
+      "url": "/#riwayat",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Panduan Penggunaan",
+      "short_name": "Panduan",
+      "description": "Tata cara pengisian SIKEMAS",
+      "url": "/#panduan",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

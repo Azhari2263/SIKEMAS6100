@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0066c0"/>
+      <stop offset="100%" stop-color="#004685"/>
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5a623"/>
+      <stop offset="100%" stop-color="#e08200"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#002244" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="108" fill="url(#bgGrad)"/>
+
+  <!-- Subtle Accent Shape -->
+  <circle cx="430" cy="80" r="140" fill="#ffffff" opacity="0.04"/>
+  <circle cx="80" cy="450" r="100" fill="#f29400" opacity="0.08"/>
+
+  <!-- Central Symbol Group -->
+  <g filter="url(#shadow)" transform="translate(20, -10)">
+    <!-- Doorway Frame -->
+    <path d="M120 100 L230 100 A12 12 0 0 1 242 112 L242 360 A12 12 0 0 1 230 372 L120 372 A12 12 0 0 1 108 360 L108 112 A12 12 0 0 1 120 100 Z" fill="#003768" opacity="0.45"/>
+    <path d="M112 104 L224 104 L224 368 L112 368 Z" fill="none" stroke="#60a5fa" stroke-width="8" stroke-dasharray="16 12" opacity="0.5"/>
+    
+    <!-- Walking Person (White) -->
+    <!-- Head -->
+    <circle cx="260" cy="150" r="32" fill="#ffffff"/>
+    <!-- Body and limbs -->
+    <path d="M250 195 C235 195 220 205 215 222 L190 285 C186 295 192 305 202 309 C212 312 222 306 226 296 L242 254 L258 290 L230 380 C226 392 234 404 246 406 C258 408 268 400 270 388 L294 314 L326 360 C334 370 348 372 358 364 C368 356 370 342 362 332 L324 278 L314 235 C310 216 296 202 278 197 C270 195 260 195 250 195 Z" fill="#ffffff"/>
+    
+    <!-- Forward Arm / Activity Arrow -->
+    <path d="M280 226 L340 262 C348 266 358 264 364 256 C370 248 368 238 360 232 L310 204 Z" fill="#ffffff" opacity="0.9"/>
+
+    <!-- Dynamic Outbound/Inbound Arrow (Orange) -->
+    <g transform="translate(320, 200)">
+      <path d="M0 25 L85 25 L85 0 L140 45 L85 90 L85 65 L0 65 Z" fill="url(#orangeGrad)"/>
+    </g>
+  </g>
+
+  <!-- Brand Typography -->
+  <text x="256" y="445" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="800" font-size="52" fill="#ffffff" text-anchor="middle" letter-spacing="6">SIKEMAS</text>
+  <text x="256" y="475" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="600" font-size="19" fill="#93c5fd" text-anchor="middle" letter-spacing="2">BPS KALBAR</text>
+</svg>

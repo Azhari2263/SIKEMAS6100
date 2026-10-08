@@ -1,0 +1,7 @@
+{
+  "name": "SIKEMAS BPS Kalbar",
+  "description": "Sistem Keterangan Keluar Masuk Pegawai BPS Provinsi Kalimantan Barat",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

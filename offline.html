@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anda Sedang Offline - SIKEMAS BPS Kalbar</title>
+    <meta name="theme-color" content="#005aa9">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bpsBlue: '#005aa9',
+                        bpsOrange: '#f29400',
+                        slateBg: '#f8fafc',
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slateBg text-slate-800 min-h-screen flex flex-col justify-between font-sans p-4 antialiased">
+    <!-- Header -->
+    <header class="max-w-md mx-auto w-full pt-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-bpsBlue flex items-center justify-center text-white shadow-md shadow-bpsBlue/20">
+                <i class="fa-solid fa-person-walking-arrow-right text-base"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-base text-slate-800 tracking-wider">SIKEMAS</h1>
+                <p class="text-[9px] text-slate-400 font-medium">BPS Provinsi Kalimantan Barat</p>
+            </div>
+        </div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+            Offline
+        </span>
+    </header>
+
+    <!-- Main Card -->
+    <main class="max-w-md mx-auto w-full my-auto py-8">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 border border-slate-100 text-center space-y-5">
+            <!-- Icon Illustration -->
+            <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
+                <div class="absolute inset-0 rounded-full bg-amber-100/60 animate-pulse"></div>
+                <div class="w-20 h-20 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-3xl shadow-sm z-10">
+                    <i class="fa-solid fa-wifi-slash"></i>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">Koneksi Terputus</h2>
+                <p class="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+                    Perangkat Anda saat ini tidak terhubung ke jaringan internet. Beberapa fitur presensi dan penyimpanan online membutuhkan koneksi aktif.
+                </p>
+            </div>
+
+            <!-- Offline Capabilities Note -->
+            <div class="bg-slate-50 rounded-2xl p-4 text-left border border-slate-100 space-y-2">
+                <p class="text-[11px] font-bold text-bpsBlue uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved text-xs"></i> Mode Offline Aktif
+                </p>
+                <ul class="text-[11px] text-slate-600 space-y-1.5 pl-1">
+                    <li class="flex items-start gap-2">
+                        <i class="fa-solid fa-check text-emerald-500 mt-0.5"></i>
+                        <span>Aplikasi dan formulir tetap tersimpan di perangkat Anda.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <i class="fa-solid fa-check text-emerald-500 mt-0.5"></i>
+                        <span>Riwayat yang sebelumnya dimuat tetap dapat diakses.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <i class="fa-solid fa-rotate text-amber-500 mt-0.5"></i>
+                        <span>Data akan disinkronkan saat koneksi kembali normal.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Actions -->
+            <div class="space-y-2.5 pt-2">
+                <button onclick="handleRetry()" id="btn-retry"
+                    class="w-full bg-bpsBlue text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-bpsBlue/20 hover:bg-opacity-95 active:scale-[0.98] transition-all text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right" id="retry-icon"></i>
+                    <span>Coba Hubungkan Kembali</span>
+                </button>
+                <a href="/"
+                    class="w-full bg-slate-100 text-slate-700 font-bold py-3 px-4 rounded-xl hover:bg-slate-200 transition-all text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-house text-slate-400"></i>
+                    <span>Buka Halaman Utama</span>
+                </a>
+            </div>
+
+            <!-- Online Notification Banner -->
+            <div id="online-notification" class="hidden p-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold animate-bounce">
+                <i class="fa-solid fa-circle-check mr-1 text-emerald-600"></i>
+                Koneksi internet kembali normal! Memuat ulang...
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-md mx-auto w-full text-center pb-4 text-[10px] text-slate-400 font-medium">
+        &copy; 2026 Tim Umum & Humas BPS Provinsi Kalimantan Barat
+    </footer>
+
+    <script>
+        function handleRetry() {
+            const btn = document.getElementById('btn-retry');
+            const icon = document.getElementById('retry-icon');
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+
+            if (navigator.onLine) {
+                window.location.reload();
+            } else {
+                fetch('/api', { method: 'GET', cache: 'no-store' })
+                    .then(() => {
+                        window.location.href = '/';
+                    })
+                    .catch(() => {
+                        setTimeout(() => {
+                            icon.classList.remove('fa-spin');
+                            btn.disabled = false;
+                        }, 800);
+                    });
+            }
+        }
+
+        window.addEventListener('online', () => {
+            const banner = document.getElementById('online-notification');
+            banner.classList.remove('hidden');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1200);
+        });
+    </script>
+</body>
+</html>

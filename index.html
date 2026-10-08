@@ -3,8 +3,28 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>SIKEMAS BPS Kalbar</title>
+    <meta name="description" content="Sistem Keterangan Keluar Masuk Pegawai BPS Provinsi Kalimantan Barat">
+    <meta property="og:title" content="SIKEMAS BPS Kalbar">
+    <meta property="og:description" content="Sistem Keterangan Keluar Masuk Pegawai BPS Provinsi Kalimantan Barat">
+
+    <!-- Progressive Web App (PWA) Meta & Icons -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#005aa9">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="SIKEMAS">
+    <meta name="application-name" content="SIKEMAS BPS Kalbar">
+    <meta name="msapplication-TileColor" content="#005aa9">
+
+    <!-- PWA Favicon & Apple Touch Icons -->
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+
     <!-- Google Fonts & Tailwind CSS & FontAwesome Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
@@ -31,6 +51,8 @@
     <style>
         body {
             -webkit-tap-highlight-color: transparent;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
         }
 
         .tab-content {
@@ -82,6 +104,60 @@
 </head>
 
 <body class="bg-slateBg text-slate-800 min-h-screen sidebar-transition">
+
+    <!-- PWA New Version Update Banner -->
+    <div id="pwa-update-banner"
+        class="fixed top-4 left-1/2 -translate-x-1/2 z-[9998] hidden max-w-md w-[92%] bg-slate-900/95 text-white backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-slate-700/60 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-bpsBlue flex items-center justify-center text-white flex-shrink-0">
+                <i class="fa-solid fa-arrows-rotate fa-spin text-xs"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold leading-tight">Pembaruan Tersedia</p>
+                <p class="text-[10px] text-slate-300">Versi aplikasi baru siap digunakan.</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <button onclick="dismissUpdateBanner()" class="text-[11px] text-slate-400 hover:text-white px-2 py-1">Nanti</button>
+            <button onclick="applyPWAUpdate()" class="bg-bpsOrange text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-md hover:bg-opacity-90 active:scale-95 transition-all">Perbarui</button>
+        </div>
+    </div>
+
+    <!-- PWA Offline Floating Pill -->
+    <div id="offline-toast"
+        class="fixed bottom-20 lg:bottom-6 right-4 z-[9997] hidden bg-amber-600/95 text-white backdrop-blur-sm px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-amber-500/40">
+        <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+        <span>Anda sedang offline (mode cache aktif)</span>
+    </div>
+
+    <!-- PWA iOS Safari Install Guide Modal -->
+    <div id="ios-install-modal"
+        class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-[3px] flex items-center justify-center p-4 z-[999]">
+        <div class="modal-card bg-white w-full max-w-[380px] rounded-2xl p-6 shadow-2xl border border-slate-100 text-center space-y-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-50 text-bpsBlue flex items-center justify-center mx-auto text-2xl shadow-sm">
+                <i class="fa-brands fa-apple"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Instal di iPhone / iPad</h3>
+                <p class="text-xs text-slate-500 mt-1">Gunakan SIKEMAS seperti aplikasi native di perangkat iOS Anda.</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-4 text-left text-xs text-slate-600 space-y-2.5 border border-slate-100">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0">1</span>
+                    <span>Ketuk tombol <strong>Share</strong> (ikon bagikan <i class="fa-solid fa-arrow-up-from-bracket"></i>) di menu Safari.</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0">2</span>
+                    <span>Gulir ke bawah dan ketuk <strong>Tambah ke Layar Utama</strong> (<em>Add to Home Screen</em>).</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0">3</span>
+                    <span>Ketuk <strong>Tambah</strong> di sudut kanan atas. SIKEMAS siap digunakan!</span>
+                </div>
+            </div>
+            <button onclick="closeIOSModal()" class="w-full bg-bpsBlue text-white font-bold py-3 px-4 rounded-xl shadow-md text-xs hover:bg-opacity-90 active:scale-95 transition-all">Tutup Panduan</button>
+        </div>
+    </div>
 
     <!-- Loading Spinner Overlay (Premium Dialog Style) -->
     <div id="loader"
@@ -164,6 +240,10 @@
                     <i class="fa-solid fa-circle-info text-lg"></i>
                     <span class="nav-text sidebar-transition">Panduan</span>
                 </button>
+                <button id="sidebar-nav-install" onclick="triggerPWAInstall()" class="hidden sidebar-nav-item w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-bpsBlue bg-blue-50/80 border border-blue-200/60 hover:bg-blue-100/70">
+                    <i class="fa-solid fa-download text-lg"></i>
+                    <span class="nav-text sidebar-transition">Instal Aplikasi</span>
+                </button>
             </nav>
             
             <!-- Sidebar Footer -->
@@ -179,14 +259,20 @@
             <!-- TOP HEADER -->
             <header class="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm shadow-slate-100/30">
                 <!-- Mobile Brand -->
-                <div class="flex items-center gap-3 lg:hidden">
-                    <div class="w-8 h-8 rounded-xl bg-bpsBlue flex-shrink-0 flex items-center justify-center text-white shadow-md shadow-bpsBlue/20">
-                        <i class="fa-solid fa-person-walking-arrow-right text-sm"></i>
+                <div class="flex items-center justify-between w-full lg:hidden">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-xl bg-bpsBlue flex-shrink-0 flex items-center justify-center text-white shadow-md shadow-bpsBlue/20">
+                            <i class="fa-solid fa-person-walking-arrow-right text-sm"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-extrabold text-base text-slate-800 tracking-wider">SIKEMAS</h1>
+                            <p class="text-[9px] text-slate-400 font-medium -mt-0.5">Sistem Keterangan Keluar Masuk Pegawai</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 class="font-extrabold text-base text-slate-800 tracking-wider">SIKEMAS</h1>
-                        <p class="text-[9px] text-slate-400 font-medium -mt-0.5">Sistem Keterangan Keluar Masuk Pegawai</p>
-                    </div>
+                    <button id="btn-pwa-install-mobile" onclick="triggerPWAInstall()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-bpsBlue text-white font-bold text-xs shadow-sm active:scale-95 transition-all">
+                        <i class="fa-solid fa-download text-[10px]"></i>
+                        <span>Instal</span>
+                    </button>
                 </div>
                 
                 <!-- Desktop Title -->
@@ -195,8 +281,12 @@
                     <p class="text-[10px] text-slate-400 font-semibold mt-0.5">BPS Provinsi Kalimantan Barat</p>
                 </div>
                 
-                <!-- Live Clock & Avatar -->
-                <div class="flex items-center gap-4">
+                <!-- Live Clock & Avatar & PWA Install -->
+                <div class="flex items-center gap-3 lg:gap-4">
+                    <button id="btn-pwa-install-header" onclick="triggerPWAInstall()" class="hidden items-center gap-2 px-3.5 py-2 rounded-xl bg-bpsBlue text-white font-bold text-xs shadow-md shadow-bpsBlue/20 hover:bg-opacity-90 active:scale-95 transition-all">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Instal Aplikasi</span>
+                    </button>
                     <div class="text-right hidden sm:block">
                         <p id="live-time" class="text-xs font-bold text-slate-700">00:00:00</p>
                         <p id="live-date" class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Sabtu, 04 Juli 2026</p>
@@ -431,9 +521,8 @@
     </div>
 
     <script>
-        // Konfigurasi URL Google Apps Script
-        // const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyv-BnYEzLO41NkhkG9kRxuZQ_AzgbF51hamfACEbokj4WTdWhicwPsR5wrJ2Xa3W4Z/exec";
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVVl2X7Xjt3SE8G1-xgpofjKCYEfG7eMuRWFlKAP_cKz7fN7AffUy6_LVdscT1DwcdYw/exec";
+        // Konfigurasi URL API Backend SIKEMAS
+        const SCRIPT_URL = "/api";
         
         // State Manajemen Sesi Aktif
         let activeSession = {
@@ -468,6 +557,11 @@
 
             // Mulai Jam Digital & Tanggal Real-time
             startLiveClock();
+
+            // PWA Inisialisasi: Service Worker, Install Prompt, & Status Jaringan
+            initServiceWorker();
+            initPWAInstallPrompt();
+            initNetworkStatusListeners();
 
             // Pastikan scroll aktif (menghindari efek cache DOM browser lama)
             document.body.classList.remove('overflow-hidden');
@@ -1205,6 +1299,192 @@
                 } catch (e) { }
             }
             return val;
+        }
+
+        // ================= PWA LOGIC & SERVICE WORKER =================
+        let deferredPWAInstallPrompt = null;
+        let pwaRegistration = null;
+
+        // Cek jika aplikasi berjalan dalam mode standalone (sudah terinstal)
+        function isPWARunningStandalone() {
+            return window.matchMedia('(display-mode: standalone)').matches ||
+                   window.navigator.standalone === true ||
+                   document.referrer.includes('android-app://');
+        }
+
+        // Cek jika perangkat adalah iOS (Safari)
+        function isIOSDevice() {
+            const ua = window.navigator.userAgent.toLowerCase();
+            return /iphone|ipad|ipod/.test(ua) && !(window).MSStream;
+        }
+
+        // Inisialisasi Service Worker & Update Listener
+        function initServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                        .then((reg) => {
+                            pwaRegistration = reg;
+                            console.log('[PWA] Service Worker registered with scope:', reg.scope);
+
+                            // Tangani deteksi versi baru
+                            reg.addEventListener('updatefound', () => {
+                                const newWorker = reg.installing;
+                                if (newWorker) {
+                                    newWorker.addEventListener('statechange', () => {
+                                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                            showPWAUpdateBanner();
+                                        }
+                                    });
+                                }
+                            });
+                        })
+                        .catch((err) => {
+                            console.warn('[PWA] Service Worker registration failed:', err);
+                        });
+
+                    // Muat ulang saat controller berganti (setelah user klik Perbarui)
+                    let refreshing = false;
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        if (!refreshing) {
+                            refreshing = true;
+                            window.location.reload();
+                        }
+                    });
+                });
+            }
+        }
+
+        // Inisialisasi Event Installable PWA
+        function initPWAInstallPrompt() {
+            if (isPWARunningStandalone()) {
+                hidePWAInstallButtons();
+                return;
+            }
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPWAInstallPrompt = e;
+                showPWAInstallButtons();
+            });
+
+            window.addEventListener('appinstalled', () => {
+                console.log('[PWA] SIKEMAS App was installed');
+                deferredPWAInstallPrompt = null;
+                hidePWAInstallButtons();
+                showCustomAlert("Aplikasi Terinstal", "SIKEMAS telah berhasil diinstal pada perangkat Anda. Anda kini dapat mengaksesnya langsung seperti aplikasi native.", "success");
+            });
+
+            // Tampilkan tombol untuk pengguna iOS (dengan modal panduan)
+            if (isIOSDevice() && !isPWARunningStandalone()) {
+                showPWAInstallButtons(true);
+            }
+        }
+
+        function showPWAInstallButtons(isIOS = false) {
+            const desktopBtn = document.getElementById('btn-pwa-install-header');
+            const mobileBtn = document.getElementById('btn-pwa-install-mobile');
+            const sideBtn = document.getElementById('sidebar-nav-install');
+
+            [desktopBtn, mobileBtn, sideBtn].forEach(btn => {
+                if (btn) {
+                    btn.classList.remove('hidden');
+                    btn.classList.add('flex');
+                    if (isIOS) {
+                        btn.setAttribute('title', 'Petunjuk Instal di iPhone/iPad');
+                    }
+                }
+            });
+        }
+
+        function hidePWAInstallButtons() {
+            const desktopBtn = document.getElementById('btn-pwa-install-header');
+            const mobileBtn = document.getElementById('btn-pwa-install-mobile');
+            const sideBtn = document.getElementById('sidebar-nav-install');
+
+            [desktopBtn, mobileBtn, sideBtn].forEach(btn => {
+                if (btn) {
+                    btn.classList.add('hidden');
+                    btn.classList.remove('flex');
+                }
+            });
+        }
+
+        // Aksi Pengguna Mengklik Tombol Instal
+        async function triggerPWAInstall() {
+            if (deferredPWAInstallPrompt) {
+                try {
+                    deferredPWAInstallPrompt.prompt();
+                    const { outcome } = await deferredPWAInstallPrompt.userChoice;
+                    console.log('[PWA] User choice:', outcome);
+                    if (outcome === 'accepted') {
+                        hidePWAInstallButtons();
+                    }
+                    deferredPWAInstallPrompt = null;
+                } catch (err) {
+                    console.warn('[PWA] Install prompt error:', err);
+                }
+            } else if (isIOSDevice()) {
+                showIOSModal();
+            } else {
+                showCustomAlert("Instal Aplikasi", "Untuk menginstal SIKEMAS, gunakan menu browser Anda (titik tiga) lalu pilih 'Instal SIKEMAS' atau 'Tambahkan ke Layar Utama'.", "success");
+            }
+        }
+
+        function showIOSModal() {
+            const modal = document.getElementById('ios-install-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeIOSModal() {
+            const modal = document.getElementById('ios-install-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        // Notifikasi dan Tindakan Pembaruan Aplikasi
+        function showPWAUpdateBanner() {
+            const banner = document.getElementById('pwa-update-banner');
+            if (banner) banner.classList.remove('hidden');
+        }
+
+        function dismissUpdateBanner() {
+            const banner = document.getElementById('pwa-update-banner');
+            if (banner) banner.classList.add('hidden');
+        }
+
+        function applyPWAUpdate() {
+            if (pwaRegistration && pwaRegistration.waiting) {
+                pwaRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            } else {
+                window.location.reload();
+            }
+        }
+
+        // Indikator Status Jaringan Online / Offline
+        function initNetworkStatusListeners() {
+            const offlineToast = document.getElementById('offline-toast');
+
+            function updateNetworkUI() {
+                if (navigator.onLine) {
+                    if (offlineToast) offlineToast.classList.add('hidden');
+                } else {
+                    if (offlineToast) offlineToast.classList.remove('hidden');
+                }
+            }
+
+            window.addEventListener('online', () => {
+                updateNetworkUI();
+                showCustomAlert("Terhubung Kembali", "Koneksi internet Anda telah kembali online.", "success");
+                if (activeSession && activeSession.active) {
+                    syncSessionWithServer();
+                }
+            });
+
+            window.addEventListener('offline', () => {
+                updateNetworkUI();
+            });
+
+            updateNetworkUI();
         }
     </script>
 </body>
