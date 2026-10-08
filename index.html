@@ -916,6 +916,23 @@
 
         // ================= FUNGSI API CALL =================
         
+        // Daftar nama pegawai cadangan (Offline cache BPS Kalbar)
+        const DEFAULT_EMPLOYEE_LIST = [
+            "Achmad Firdaus", "Agus Tetriansyah", "Agustinus Supriadi, S.M.", "Ajeng Prana Wengrum Wardono, S.E.",
+            "Alfiana Ayuni, A.Md", "Amanda Putri, A.Md", "Anggi Septiawan, S.Tr.Stat.", "Any Pebruana, S.Si",
+            "Arpandi", "Azhari, S.Tr.Stat.", "Devi Mirtha Hapsari, S.E.", "Diah Nadiva Soetedjo, S.I.Kom.",
+            "Dody Iskandar, ST", "Eddy Suryadi", "Eko Prasetyo", "Endang Karyuni", "Feri Yusthami",
+            "Fitri Wahyu Yuliasih, SST, ME", "Gita Wahyuntari Listyandika, SST", "Ibrahim",
+            "Levi Alvaro Samosir, A.Md.Stat", "M. Yun Imran, SE", "Mawardi", "Muhammad Muzaky Ali Fikri, A.Md.Kom",
+            "Muhammad Syukri", "Nasip Budi Waluyo", "Nufi Alabshar, SST, M.Sc", "Nugra Liantin, S.ST",
+            "Nurdila Yulianti, S.Psi", "Nurramadhanial", "Pri Eka Fitri, S.Si.", "Puji Astuti, S.Stat.",
+            "Purnomo Hari Siswanto, S.Mn", "Ramadhan", "Rania Naila Husna, A.Md.A.B", "Reza Pahlevi Arifin, SE",
+            "Riska Miwanti, A.md", "Rizky Fadli", "Salsabila Muna Shobiha, A.Md.Stat.", "Slamet Riyadi",
+            "Sri Yuli Handayati, S.Ak", "Supardiyono", "Sutejo", "Syafa'atun, S.Si., M.E.",
+            "Syarif Naufal Handayani, S.Si.", "Syarif Reza Nopriadrian Al Kadri", "Syaroni, S.T.",
+            "Yanis Munandar, S.E.", "Yunita, SST, M.Ec.Dev", "Yuni Julmiati"
+        ];
+
         // Fungsi untuk memanggil Google Apps Script dengan fetch atau google.script.run
         async function callAppsScript(action, data = {}) {
             // 1. Jika berjalan di dalam lingkungan Google Apps Script Web App, gunakan google.script.run
@@ -936,36 +953,45 @@
                 ...data
             };
 
-            // 2. Coba request ke API Backend (/api) terlebih dahulu (Vercel Serverless / Local Proxy)
-            try {
-                const response = await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'text/plain'
-                    },
-                    body: JSON.stringify(payload)
-                });
-                
-                if (response.ok) {
-                    return await response.json();
+            // 2. Coba request ke API Backend (/api) jika berjalan di web server HTTP/HTTPS
+            const isWebProtocol = window.location.protocol.startsWith('http');
+            if (isWebProtocol) {
+                try {
+                    const response = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'text/plain;charset=utf-8'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (response.ok) {
+                        const contentType = response.headers.get('content-type') || '';
+                        if (contentType.includes('application/json')) {
+                            const result = await response.json();
+                            if (result && typeof result === 'object' && result.success !== undefined) {
+                                return result;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Endpoint ${SCRIPT_URL} tidak merespons, beralih ke direct Apps Script:`, err);
                 }
-                console.warn(`Endpoint ${SCRIPT_URL} mengembalikan status ${response.status}. Mencoba direct fallback ke Google Apps Script...`);
-            } catch (err) {
-                console.warn(`Koneksi ke ${SCRIPT_URL} gagal (${err.message}). Mencoba direct fallback ke Google Apps Script...`);
             }
 
-            // 3. Fallback jika /api tidak tersedia (misal preview offline/statis), langsung ke Google Apps Script
+            // 3. Fallback langsung ke Google Apps Script Web App (CORS / Redirect-safe)
             try {
                 const response = await fetch(FALLBACK_APPS_SCRIPT_URL, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'text/plain'
+                        'Content-Type': 'text/plain;charset=utf-8'
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    redirect: 'follow'
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`Apps Script direct HTTP status: ${response.status}`);
+                    throw new Error(`Apps Script HTTP status: ${response.status}`);
                 }
                 
                 return await response.json();
@@ -976,37 +1002,60 @@
         }
 
         // ================= FUNGSI UNTUK DROPDOWN =================
+
+        // Render daftar nama pegawai ke elemen <select id="nama">
+        function populateEmployeeSelect(names) {
+            const select = document.getElementById('nama');
+            if (!select || !Array.isArray(names) || names.length === 0) return;
+            
+            const currentValue = select.value;
+            select.innerHTML = '<option value="" disabled selected>Pilih nama Anda...</option>';
+            
+            names.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+
+            // Pulihkan pilihan jika ada sesi aktif atau pilihan sebelumnya
+            if (activeSession && activeSession.active && activeSession.nama) {
+                select.value = activeSession.nama;
+            } else if (currentValue && names.includes(currentValue)) {
+                select.value = currentValue;
+            }
+        }
         
         async function loadEmployeeDropdown() {
+            // 1. Langsung inisialisasi dropdown dari cache LocalStorage atau default offline agar dropdown siap seketika
+            let cachedNames = null;
             try {
-                showLoader(true);
-                const result = await callAppsScript('getEmployeeNames');
-                showLoader(false);
-                
-                const select = document.getElementById('nama');
-                select.innerHTML = '<option value="" disabled selected>Pilih nama Anda...</option>';
-                
-                if (result && result.success && result.data && result.data.length > 0) {
-                    result.data.forEach(name => {
-                        const option = document.createElement('option');
-                        option.value = name;
-                        option.textContent = name;
-                        select.appendChild(option);
-                    });
+                const stored = localStorage.getItem('sikemas_employee_list');
+                if (stored) cachedNames = JSON.parse(stored);
+            } catch (e) {}
 
-                    // Set nilai ke nama yang aktif di sesi jika ada sesi berjalan
-                    if (activeSession && activeSession.active) {
-                        select.value = activeSession.nama;
-                    }
-                } else {
-                    select.innerHTML = '<option value="" disabled selected>Daftar pegawai kosong (Sheet User)</option>';
+            const initialNames = (cachedNames && Array.isArray(cachedNames) && cachedNames.length > 0)
+                ? cachedNames
+                : DEFAULT_EMPLOYEE_LIST;
+
+            populateEmployeeSelect(initialNames);
+
+            // 2. Sinkronkan nama pegawai terbaru dari spreadsheet Google Sheets di latar belakang
+            try {
+                const result = await callAppsScript('getEmployeeNames');
+                if (result && result.success && Array.isArray(result.data) && result.data.length > 0) {
+                    populateEmployeeSelect(result.data);
+                    try {
+                        localStorage.setItem('sikemas_employee_list', JSON.stringify(result.data));
+                    } catch (e) {}
                 }
             } catch (error) {
-                showLoader(false);
+                console.warn('Gagal sinkronisasi nama pegawai terbaru dari server, menggunakan data cadangan:', error);
+                // Pastikan dropdown tetap terisi jika sebelumnya kosong
                 const select = document.getElementById('nama');
-                select.innerHTML = '<option value="" disabled selected>Gagal memuat nama</option>';
-                showCustomAlert("Dropdown Error", "Gagal memuat daftar pegawai dari Sheet 'User'.", "error");
-                console.error('Error loading employee dropdown:', error);
+                if (!select || select.options.length <= 1) {
+                    populateEmployeeSelect(DEFAULT_EMPLOYEE_LIST);
+                }
             }
         }
 

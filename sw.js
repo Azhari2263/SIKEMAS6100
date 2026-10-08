@@ -4,7 +4,7 @@
  * Caching app-shell statis dan bypass permintaan API eksternal (network-only)
  */
 
-const CACHE_VERSION = 'sikemas-pwa-v1.0.1';
+const CACHE_VERSION = 'sikemas-pwa-v1.0.2';
 const STATIC_CACHE_NAME = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE_NAME = `${CACHE_VERSION}-runtime`;
 
@@ -103,22 +103,8 @@ self.addEventListener('fetch', (event) => {
 
   // A. BYPASS API EKSTERNAL & NON-GET (NETWORK-ONLY TANPA CACHE)
   if (isBypassApiRequest(url, request)) {
-    event.respondWith(
-      fetch(request).catch(() => {
-        // Fallback respons JSON jika jaringan offline saat memanggil API
-        return new Response(
-          JSON.stringify({
-            success: false,
-            offline: true,
-            message: 'Koneksi jaringan terputus (Offline). Silakan periksa jaringan internet Anda.'
-          }),
-          {
-            status: 503,
-            headers: { 'Content-Type': 'application/json; charset=utf-8' }
-          }
-        );
-      })
-    );
+    // Return langsung tanpa event.respondWith() agar browser memproses request
+    // menggunakan network stack native (mematuhi CORS redirect 302 Google Apps Script)
     return;
   }
 
