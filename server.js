@@ -71,11 +71,12 @@ app.get('/api', (req, res) => {
 });
 
 // PWA Service Worker with required headers
-app.get('/service-worker.js', (req, res) => {
+app.get(['/sw.js', '/service-worker.js'], (req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Service-Worker-Allowed', '/');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, 'service-worker.js'));
+  const targetFile = req.path === '/service-worker.js' ? 'service-worker.js' : 'sw.js';
+  res.sendFile(path.join(__dirname, targetFile));
 });
 
 // PWA Manifests with proper MIME types

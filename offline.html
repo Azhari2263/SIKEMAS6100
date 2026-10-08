@@ -2,9 +2,14 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <title>Anda Sedang Offline - SIKEMAS BPS Kalbar</title>
     <meta name="theme-color" content="#005aa9">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,6 +29,18 @@
             }
         }
     </script>
+    <style>
+        body {
+            padding-top: max(1.5rem, calc(1rem + env(safe-area-inset-top, 0px)));
+            padding-bottom: max(1.5rem, calc(1rem + env(safe-area-inset-bottom, 0px)));
+            padding-left: max(1rem, env(safe-area-inset-left, 0px));
+            padding-right: max(1rem, env(safe-area-inset-right, 0px));
+            overflow-x: hidden;
+        }
+        button, a {
+            touch-action: manipulation;
+        }
+    </style>
 </head>
 <body class="bg-slateBg text-slate-800 min-h-screen flex flex-col justify-between font-sans p-4 antialiased">
     <!-- Header -->

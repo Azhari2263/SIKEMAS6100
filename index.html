@@ -3,14 +3,15 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <title>SIKEMAS BPS Kalbar</title>
     <meta name="description" content="Sistem Keterangan Keluar Masuk Pegawai BPS Provinsi Kalimantan Barat">
     <meta property="og:title" content="SIKEMAS BPS Kalbar">
     <meta property="og:description" content="Sistem Keterangan Keluar Masuk Pegawai BPS Provinsi Kalimantan Barat">
 
     <!-- Progressive Web App (PWA) Meta & Icons -->
-    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="alternate" type="application/manifest+json" href="/manifest.webmanifest">
     <meta name="theme-color" content="#005aa9">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,6 +25,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <!-- Google Fonts & Tailwind CSS & FontAwesome Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
@@ -49,10 +52,88 @@
     </script>
 
     <style>
+        /* Safe Area Inset Variables & Base Mobile Layout */
+        :root {
+            --sat: env(safe-area-inset-top, 0px);
+            --sar: env(safe-area-inset-right, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+            --sal: env(safe-area-inset-left, 0px);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            overflow-x: hidden;
+            width: 100%;
+            -webkit-text-size-adjust: 100%;
+            touch-action: manipulation;
+        }
+
         body {
             -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+            width: 100%;
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            padding-left: env(safe-area-inset-left, 0px);
+            padding-right: env(safe-area-inset-right, 0px);
+        }
+
+        /* Top Header with Notch Safe-Area Adaptation */
+        header#app-header {
+            padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+        }
+
+        /* Sidebar Safe-Area Adaptation */
+        aside#sidebar {
             padding-top: env(safe-area-inset-top, 0px);
             padding-bottom: env(safe-area-inset-bottom, 0px);
+            padding-left: env(safe-area-inset-left, 0px);
+        }
+
+        /* Floating Bottom Navbar Safe-Area Adaptation */
+        .bottom-nav-safe {
+            bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+            padding-bottom: max(0.5rem, calc(0.25rem + env(safe-area-inset-bottom, 0px)));
+        }
+
+        /* Bottom Spacer to prevent content overlapping navbar */
+        .bottom-nav-spacer {
+            height: calc(6rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        /* Responsive Touch Targets (Minimum 44px - 48px on Mobile) */
+        button, input, select, textarea, a, .nav-item, .sidebar-nav-item {
+            touch-action: manipulation;
+        }
+
+        @media (max-width: 1024px) {
+            button, select, input[type="date"], input[type="text"], .nav-item {
+                min-height: 44px;
+            }
+        }
+
+        /* Smooth Table & Horizontal Container Scrolling */
+        .table-responsive,
+        .scroll-touch,
+        .overflow-x-auto,
+        table {
+            -webkit-overflow-scrolling: touch;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        /* Prevent Any Unintended Horizontal Overflow */
+        #main-wrapper, main {
+            max-width: 100vw;
+            overflow-x: hidden;
         }
 
         .tab-content {
@@ -80,6 +161,10 @@
             opacity: 0;
             pointer-events: none;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding-top: max(1rem, env(safe-area-inset-top, 0px));
+            padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+            padding-left: max(1rem, env(safe-area-inset-left, 0px));
+            padding-right: max(1rem, env(safe-area-inset-right, 0px));
         }
 
         .modal-overlay.active {
@@ -90,6 +175,9 @@
         .modal-card {
             transform: scale(0.95);
             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-height: calc(100vh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .modal-overlay.active .modal-card {
@@ -130,32 +218,82 @@
         <span>Anda sedang offline (mode cache aktif)</span>
     </div>
 
-    <!-- PWA iOS Safari Install Guide Modal -->
-    <div id="ios-install-modal"
+    <!-- PWA Dual Install Guide Modal (Android & iOS) -->
+    <div id="pwa-install-modal"
         class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-[3px] flex items-center justify-center p-4 z-[999]">
-        <div class="modal-card bg-white w-full max-w-[380px] rounded-2xl p-6 shadow-2xl border border-slate-100 text-center space-y-4">
-            <div class="w-14 h-14 rounded-2xl bg-blue-50 text-bpsBlue flex items-center justify-center mx-auto text-2xl shadow-sm">
-                <i class="fa-brands fa-apple"></i>
+        <div class="modal-card bg-white w-full max-w-[420px] rounded-2xl p-5 sm:p-6 shadow-2xl border border-slate-100 text-center space-y-4">
+            
+            <!-- Platform Toggle Tabs -->
+            <div class="flex bg-slate-100 p-1 rounded-xl gap-1">
+                <button id="pwa-tab-btn-android" onclick="switchInstallGuideTab('android')"
+                    class="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 bg-white text-emerald-700 shadow-sm">
+                    <i class="fa-brands fa-android text-emerald-600"></i> Android / Chrome
+                </button>
+                <button id="pwa-tab-btn-ios" onclick="switchInstallGuideTab('ios')"
+                    class="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800">
+                    <i class="fa-brands fa-apple"></i> iOS / Safari
+                </button>
             </div>
-            <div>
-                <h3 class="text-base font-bold text-slate-900">Instal di iPhone / iPad</h3>
-                <p class="text-xs text-slate-500 mt-1">Gunakan SIKEMAS seperti aplikasi native di perangkat iOS Anda.</p>
+
+            <!-- Content for Android -->
+            <div id="pwa-guide-android" class="space-y-4">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-xl shadow-sm">
+                    <i class="fa-brands fa-android"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Instal di Android</h3>
+                    <p class="text-xs text-slate-500 mt-1">Pasang SIKEMAS langsung ke layar utama Android Anda untuk akses cepat tanpa browser.</p>
+                </div>
+                
+                <div class="bg-slate-50 rounded-xl p-4 text-left text-xs text-slate-600 space-y-2.5 border border-slate-100">
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">1</span>
+                        <span>Klik tombol <strong>Pasang Aplikasi Sekarang</strong> di bawah jika tersedia, atau ketuk menu titik tiga (<strong>⋮</strong>) di sudut kanan atas browser Chrome.</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">2</span>
+                        <span>Pilih menu <strong>Instal aplikasi</strong> atau <strong>Tambahkan ke Layar Utama</strong> (<em>Add to Home Screen</em>).</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">3</span>
+                        <span>Konfirmasi dengan memilih <strong>Instal</strong>. Aplikasi SIKEMAS siap digunakan dari beranda HP Anda!</span>
+                    </div>
+                </div>
+
+                <button id="btn-modal-native-android" onclick="triggerNativeInstallPrompt()"
+                    class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl shadow-md text-xs hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Pasang Aplikasi Sekarang</span>
+                </button>
             </div>
-            <div class="bg-slate-50 rounded-xl p-4 text-left text-xs text-slate-600 space-y-2.5 border border-slate-100">
-                <div class="flex items-center gap-3">
-                    <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0">1</span>
-                    <span>Ketuk tombol <strong>Share</strong> (ikon bagikan <i class="fa-solid fa-arrow-up-from-bracket"></i>) di menu Safari.</span>
+
+            <!-- Content for iOS (Safari) -->
+            <div id="pwa-guide-ios" class="space-y-4 hidden">
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 text-bpsBlue flex items-center justify-center mx-auto text-xl shadow-sm">
+                    <i class="fa-brands fa-apple"></i>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0">2</span>
-                    <span>Gulir ke bawah dan ketuk <strong>Tambah ke Layar Utama</strong> (<em>Add to Home Screen</em>).</span>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Instal di iPhone / iPad</h3>
+                    <p class="text-xs text-slate-500 mt-1">Gunakan SIKEMAS seperti aplikasi native di perangkat iOS Anda.</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0">3</span>
-                    <span>Ketuk <strong>Tambah</strong> di sudut kanan atas. SIKEMAS siap digunakan!</span>
+                
+                <div class="bg-slate-50 rounded-xl p-4 text-left text-xs text-slate-600 space-y-2.5 border border-slate-100">
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">1</span>
+                        <span>Buka SIKEMAS di browser <strong>Safari</strong> lalu ketuk tombol <strong>Share</strong> (ikon bagikan <i class="fa-solid fa-arrow-up-from-bracket"></i>) di menu bawah.</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">2</span>
+                        <span>Gulir ke bawah dan ketuk opsi <strong>Tambah ke Layar Utama</strong> (<em>Add to Home Screen</em> <i class="fa-regular fa-square-plus"></i>).</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 rounded-full bg-blue-100 text-bpsBlue flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">3</span>
+                        <span>Ketuk <strong>Tambah</strong> di sudut kanan atas. SIKEMAS kini terpasang di layar utama tanpa batas bilah browser!</span>
+                    </div>
                 </div>
             </div>
-            <button onclick="closeIOSModal()" class="w-full bg-bpsBlue text-white font-bold py-3 px-4 rounded-xl shadow-md text-xs hover:bg-opacity-90 active:scale-95 transition-all">Tutup Panduan</button>
+
+            <button onclick="closePWAInstallModal()" class="w-full bg-slate-100 text-slate-600 font-bold py-2.5 px-4 rounded-xl text-xs hover:bg-slate-200 active:scale-95 transition-all">Tutup Panduan</button>
         </div>
     </div>
 
@@ -257,7 +395,7 @@
         <div id="main-wrapper" class="flex-1 flex flex-col min-h-screen sidebar-transition lg:pl-64 w-full">
             
             <!-- TOP HEADER -->
-            <header class="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm shadow-slate-100/30">
+            <header id="app-header" class="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm shadow-slate-100/30">
                 <!-- Mobile Brand -->
                 <div class="flex items-center justify-between w-full lg:hidden">
                     <div class="flex items-center gap-3">
@@ -496,25 +634,25 @@
             </footer>
 
             <!-- Spacer khusus mobile agar footer terdorong ke atas melewati Bottom Navigation Bar -->
-            <div class="h-36 lg:hidden flex-shrink-0"></div>
+            <div class="bottom-nav-spacer h-36 lg:hidden flex-shrink-0"></div>
         </div>
     </div>
 
     <!-- Bottom Navbar Navigation (mobile/tablet only) -->
     <div
-        class="fixed bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md border border-slate-100 py-3 px-2 rounded-2xl shadow-[0_-5px_25px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.06)] flex justify-around items-center z-50 lg:hidden">
+        class="bottom-nav-safe fixed bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md border border-slate-100 py-3 px-2 rounded-2xl shadow-[0_-5px_25px_rgba(0,0,0,0.04),0_10px_20px_rgba(0,0,0,0.06)] flex justify-around items-center z-50 lg:hidden">
         <button id="btn-nav-input" onclick="switchTab('input', this)"
-            class="nav-item flex flex-col items-center gap-1 flex-1 text-bpsBlue">
+            class="nav-item flex flex-col items-center justify-center gap-1 flex-1 py-1 text-bpsBlue">
             <i class="fa-solid fa-pen-to-square text-lg"></i>
             <span class="text-[9px] font-bold tracking-wider">INPUT</span>
         </button>
         <button id="btn-nav-riwayat" onclick="switchTab('riwayat', this)"
-            class="nav-item flex flex-col items-center gap-1 flex-1 text-slate-400">
+            class="nav-item flex flex-col items-center justify-center gap-1 flex-1 py-1 text-slate-400">
             <i class="fa-solid fa-clock-rotate-left text-lg"></i>
             <span class="text-[9px] font-bold tracking-wider">RIWAYAT</span>
         </button>
         <button id="btn-nav-panduan" onclick="switchTab('panduan', this)"
-            class="nav-item flex flex-col items-center gap-1 flex-1 text-slate-400">
+            class="nav-item flex flex-col items-center justify-center gap-1 flex-1 py-1 text-slate-400">
             <i class="fa-solid fa-circle-info text-lg"></i>
             <span class="text-[9px] font-bold tracking-wider">PANDUAN</span>
         </button>
@@ -1336,14 +1474,14 @@
             return /iphone|ipad|ipod/.test(ua) && !(window).MSStream;
         }
 
-        // Inisialisasi Service Worker & Update Listener
+        // Inisialisasi Service Worker (/sw.js) & Update Listener
         function initServiceWorker() {
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                    navigator.serviceWorker.register('/sw.js', { scope: '/' })
                         .then((reg) => {
                             pwaRegistration = reg;
-                            console.log('[PWA] Service Worker registered with scope:', reg.scope);
+                            console.log('[PWA] Service Worker (/sw.js) registered with scope:', reg.scope);
 
                             // Tangani deteksi versi baru
                             reg.addEventListener('updatefound', () => {
@@ -1358,7 +1496,10 @@
                             });
                         })
                         .catch((err) => {
-                            console.warn('[PWA] Service Worker registration failed:', err);
+                            console.warn('[PWA] /sw.js registration failed, trying fallback to /service-worker.js:', err);
+                            navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                                .then(reg => { pwaRegistration = reg; })
+                                .catch(e => console.warn('[PWA] Fallback service worker also failed:', e));
                         });
 
                     // Muat ulang saat controller berganti (setelah user klik Perbarui)
@@ -1384,22 +1525,36 @@
                 e.preventDefault();
                 deferredPWAInstallPrompt = e;
                 showPWAInstallButtons();
+                updateModalNativeButtonState(true);
             });
 
             window.addEventListener('appinstalled', () => {
                 console.log('[PWA] SIKEMAS App was installed');
                 deferredPWAInstallPrompt = null;
                 hidePWAInstallButtons();
-                showCustomAlert("Aplikasi Terinstal", "SIKEMAS telah berhasil diinstal pada perangkat Anda. Anda kini dapat mengaksesnya langsung seperti aplikasi native.", "success");
+                closePWAInstallModal();
+                showCustomAlert("Aplikasi Terinstal", "SIKEMAS telah berhasil diinstal pada perangkat Anda. Anda kini dapat mengaksesnya langsung dari layar utama.", "success");
             });
 
-            // Tampilkan tombol untuk pengguna iOS (dengan modal panduan)
-            if (isIOSDevice() && !isPWARunningStandalone()) {
-                showPWAInstallButtons(true);
+            // Tampilkan tombol instal jika belum terinstal di mode standalone
+            showPWAInstallButtons();
+            updateModalNativeButtonState(false);
+        }
+
+        function updateModalNativeButtonState(isReady) {
+            const btn = document.getElementById('btn-modal-native-android');
+            if (btn) {
+                if (isReady) {
+                    btn.classList.remove('opacity-70');
+                    btn.innerHTML = '<i class="fa-solid fa-download"></i><span>Pasang Aplikasi Sekarang</span>';
+                } else {
+                    btn.classList.add('opacity-70');
+                }
             }
         }
 
-        function showPWAInstallButtons(isIOS = false) {
+        function showPWAInstallButtons() {
+            if (isPWARunningStandalone()) return;
             const desktopBtn = document.getElementById('btn-pwa-install-header');
             const mobileBtn = document.getElementById('btn-pwa-install-mobile');
             const sideBtn = document.getElementById('sidebar-nav-install');
@@ -1408,9 +1563,6 @@
                 if (btn) {
                     btn.classList.remove('hidden');
                     btn.classList.add('flex');
-                    if (isIOS) {
-                        btn.setAttribute('title', 'Petunjuk Instal di iPhone/iPad');
-                    }
                 }
             });
         }
@@ -1437,26 +1589,77 @@
                     console.log('[PWA] User choice:', outcome);
                     if (outcome === 'accepted') {
                         hidePWAInstallButtons();
+                        closePWAInstallModal();
                     }
                     deferredPWAInstallPrompt = null;
+                    return;
                 } catch (err) {
                     console.warn('[PWA] Install prompt error:', err);
                 }
-            } else if (isIOSDevice()) {
-                showIOSModal();
+            }
+
+            // Jika native prompt belum siap atau perangkat iOS, buka modal panduan
+            if (isIOSDevice()) {
+                openPWAInstallModal('ios');
             } else {
-                showCustomAlert("Instal Aplikasi", "Untuk menginstal SIKEMAS, gunakan menu browser Anda (titik tiga) lalu pilih 'Instal SIKEMAS' atau 'Tambahkan ke Layar Utama'.", "success");
+                openPWAInstallModal('android');
             }
         }
 
-        function showIOSModal() {
-            const modal = document.getElementById('ios-install-modal');
+        async function triggerNativeInstallPrompt() {
+            if (deferredPWAInstallPrompt) {
+                try {
+                    deferredPWAInstallPrompt.prompt();
+                    const { outcome } = await deferredPWAInstallPrompt.userChoice;
+                    console.log('[PWA] Native prompt outcome:', outcome);
+                    if (outcome === 'accepted') {
+                        hidePWAInstallButtons();
+                        closePWAInstallModal();
+                    }
+                    deferredPWAInstallPrompt = null;
+                } catch (e) {
+                    console.warn('[PWA] Native prompt trigger error:', e);
+                }
+            } else {
+                showCustomAlert("Instal Lewat Menu Browser", "Tekan ikon titik tiga (⋮) di pojok kanan atas browser Google Chrome Anda, lalu pilih 'Instal aplikasi' atau 'Tambahkan ke Layar Utama'.", "success");
+            }
+        }
+
+        function openPWAInstallModal(platform = null) {
+            const targetPlatform = platform || (isIOSDevice() ? 'ios' : 'android');
+            switchInstallGuideTab(targetPlatform);
+            const modal = document.getElementById('pwa-install-modal') || document.getElementById('ios-install-modal');
             if (modal) modal.classList.add('active');
         }
 
-        function closeIOSModal() {
-            const modal = document.getElementById('ios-install-modal');
+        function closePWAInstallModal() {
+            const modal = document.getElementById('pwa-install-modal') || document.getElementById('ios-install-modal');
             if (modal) modal.classList.remove('active');
+        }
+
+        // Kompatibilitas fungsi lama
+        function showIOSModal() { openPWAInstallModal('ios'); }
+        function closeIOSModal() { closePWAInstallModal(); }
+
+        function switchInstallGuideTab(platform) {
+            const androidTabBtn = document.getElementById('pwa-tab-btn-android');
+            const iosTabBtn = document.getElementById('pwa-tab-btn-ios');
+            const androidGuide = document.getElementById('pwa-guide-android');
+            const iosGuide = document.getElementById('pwa-guide-ios');
+
+            if (!androidTabBtn || !iosTabBtn || !androidGuide || !iosGuide) return;
+
+            if (platform === 'ios') {
+                iosGuide.classList.remove('hidden');
+                androidGuide.classList.add('hidden');
+                iosTabBtn.className = "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 bg-white text-bpsBlue shadow-sm";
+                androidTabBtn.className = "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800";
+            } else {
+                androidGuide.classList.remove('hidden');
+                iosGuide.classList.add('hidden');
+                androidTabBtn.className = "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 bg-white text-emerald-700 shadow-sm";
+                iosTabBtn.className = "flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800";
+            }
         }
 
         // Notifikasi dan Tindakan Pembaruan Aplikasi
