@@ -2,17 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbxVVl2X7Xjt3SE8G1-xgpofjKCYEfG7eMuRWFlKAP_cKz7fN7AffUy6_LVdscT1DwcdYw/exec';
 
 app.use(cors());
-
-// Middleware to handle both application/json and text/plain (used by Apps Script callers)
+app.use(express.json());
 app.use(express.text({ type: ['text/plain', 'text/*', '*/*'] }));
 
 function parseRequestBody(req) {
@@ -23,289 +22,52 @@ function parseRequestBody(req) {
     try {
       return JSON.parse(req.body);
     } catch {
-      return {};
+      return req.body;
     }
   }
   return {};
 }
 
-// In-memory employee store
-const employees = [
-  "Azhari",
-  "Budi Santoso",
-  "Dewi Lestari",
-  "Rudi Hartono",
-  "Siti Rahma",
-  "Ahmad Fauzi",
-  "Nurul Hidayah",
-  "Eko Prasetyo",
-  "Indah Permata",
-  "Bambang Wijaya"
-];
-
-// Initial seeded records
-const records = [
-  {
-    nama: "Azhari",
-    hari: "Rabu",
-    tanggal: "07-10-2026",
-    waktuKeluar: "09:15",
-    waktuKembali: "11:45",
-    keterangan: "Koordinasi teknis kegiatan SAKERNAS ke BPS Kota Pontianak",
-    timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
-    sessionId: "init-session-1"
-  },
-  {
-    nama: "Budi Santoso",
-    hari: "Selasa",
-    tanggal: "06-10-2026",
-    waktuKeluar: "13:30",
-    waktuKembali: "15:20",
-    keterangan: "Rapat koordinasi Tim Diseminasi Statistik Daerah",
-    timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-    sessionId: "init-session-2"
-  },
-  {
-    nama: "Dewi Lestari",
-    hari: "Senin",
-    tanggal: "05-10-2026",
-    waktuKeluar: "10:00",
-    waktuKembali: "12:15",
-    keterangan: "Pengambilan sampel survei harga konsumen pasar Flamboyan",
-    timestamp: new Date(Date.now() - 3600000 * 48).toISOString(),
-    sessionId: "init-session-3"
-  }
-];
-
-function hitungDurasiMenit(keluar, kembali) {
-  try {
-    const kParts = keluar.split(':');
-    const bParts = kembali.split(':');
-    if (kParts.length >= 2 && bParts.length >= 2) {
-      const kMin = parseInt(kParts[0], 10) * 60 + parseInt(kParts[1], 10);
-      const bMin = parseInt(bParts[0], 10) * 60 + parseInt(bParts[1], 10);
-      let diff = bMin - kMin;
-      if (diff < 0) diff += 24 * 60; // handling lewat tengah malam
-      return diff;
-    }
-  } catch {}
-  return null;
-}
-
-function formatDurasi(menit) {
-  if (menit === null || menit < 0) return "-";
-  const jam = Math.floor(menit / 60);
-  const sisaMenit = menit % 60;
-  if (jam > 0) {
-    return `${jam} jam ${sisaMenit} menit`;
-  }
-  return `${sisaMenit} menit`;
-}
-
-function handleApiAction(payload) {
-  const action = payload.action;
-
-  switch (action) {
-    case 'getEmployeeNames': {
-      return { success: true, data: employees };
-    }
-
-    case 'saveRecord': {
-      const sessionId = payload.sessionId || crypto.randomUUID();
-      const timestamp = new Date().toISOString();
-
-      let formattedDate = payload.tanggal || "-";
-      if (formattedDate.includes('-')) {
-        const parts = formattedDate.split('-');
-        if (parts.length === 3 && parts[0].length === 4) {
-          formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-        }
-      }
-
-      const newRecord = {
-        nama: payload.nama || "-",
-        hari: payload.hari || "-",
-        tanggal: formattedDate,
-        waktuKeluar: payload.waktuKeluar || "-",
-        waktuKembali: payload.waktuKembali || "-",
-        keterangan: payload.keterangan || "-",
-        timestamp: timestamp,
-        sessionId: sessionId
-      };
-
-      records.unshift(newRecord);
-
-      return {
-        success: true,
-        message: "Rencana kegiatan berhasil disimpan! Sesi presensi Anda kini aktif.",
-        rowIndex: records.length,
-        sessionId: sessionId
-      };
-    }
-
-    case 'updateTime': {
-      const { sessionId, nama, type, time } = payload;
-      let record = records.find(r => r.sessionId === sessionId && r.nama === nama);
-      if (!record && nama) {
-        record = records.find(r => r.nama === nama && r.waktuKembali === "-");
-      }
-
-      if (!record) {
-        return { success: false, message: "Sesi aktif tidak ditemukan di database." };
-      }
-
-      if (type === 'keluar') {
-        record.waktuKeluar = time;
-        return { success: true, message: `Berhasil mencatat Jam Keluar: ${time}` };
-      } else {
-        record.waktuKembali = time;
-        return { success: true, message: `Berhasil mencatat Jam Kembali: ${time}` };
-      }
-    }
-
-    case 'deleteRecord': {
-      const { sessionId, nama } = payload;
-      const index = records.findIndex(r => 
-        (r.sessionId === sessionId && r.nama === nama) || 
-        (nama && r.nama === nama && r.waktuKembali === "-")
-      );
-
-      if (index === -1) {
-        return { success: false, message: "Sesi aktif tidak ditemukan atau sudah dihapus." };
-      }
-
-      records.splice(index, 1);
-      return {
-        success: true,
-        message: "Sesi berhasil dibatalkan dan rencana kegiatan dihapus dari database SIKEMAS secara permanen."
-      };
-    }
-
-    case 'checkSession': {
-      const { sessionId, nama } = payload;
-      let record = records.find(r => r.sessionId === sessionId && r.nama === nama);
-      if (!record && nama) {
-        record = records.find(r => r.nama === nama && r.waktuKembali === "-");
-      }
-
-      if (!record) {
-        return { found: false };
-      }
-
-      return {
-        found: true,
-        nama: record.nama || "-",
-        waktuKeluar: record.waktuKeluar || "-",
-        waktuKembali: record.waktuKembali || "-",
-        keterangan: record.keterangan || "-"
-      };
-    }
-
-    case 'getRecords': {
-      const employeeName = typeof payload === 'object' && payload.nama ? payload.nama : (typeof payload === 'string' ? payload : "");
-      if (!employeeName) {
-        return { success: true, data: [] };
-      }
-
-      const userRecords = records
-        .filter(r => r.nama === employeeName)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .map(r => ({
-          nama: r.nama,
-          hari: r.hari,
-          tanggal: r.tanggal,
-          waktuKeluar: r.waktuKeluar,
-          waktuKembali: r.waktuKembali,
-          keterangan: r.keterangan
-        }));
-
-      return { success: true, data: userRecords };
-    }
-
-    case 'getAllRecords': {
-      const all = records.map(r => {
-        const waktuKeluar = String(r.waktuKeluar || "-").trim();
-        const waktuKembali = String(r.waktuKembali || "-").trim();
-
-        let durasiMenit = null;
-        let durasiTeks = "-";
-        if (waktuKeluar !== "-" && waktuKembali !== "-") {
-          durasiMenit = hitungDurasiMenit(waktuKeluar, waktuKembali);
-          if (durasiMenit !== null) {
-            durasiTeks = formatDurasi(durasiMenit);
-          }
-        } else if (waktuKeluar !== "-" && waktuKembali === "-") {
-          durasiTeks = "Sedang Keluar";
-        }
-
-        return {
-          nama: r.nama,
-          hari: r.hari,
-          tanggal: r.tanggal,
-          waktuKeluar: waktuKeluar,
-          waktuKembali: waktuKembali,
-          keterangan: r.keterangan,
-          timestamp: r.timestamp,
-          sessionId: r.sessionId,
-          durasiMenit: durasiMenit,
-          durasiTeks: durasiTeks
-        };
-      });
-
-      return { success: true, data: all };
-    }
-
-    case 'getSpreadsheetUrl':
-      return { success: true, url: "#" };
-
-    case 'getScriptUrl':
-      return { success: true, url: "/api" };
-
-    case 'adminForceCompleteSession': {
-      const { sessionId, nama, time } = payload;
-      let record = records.find(r => r.sessionId === sessionId && r.nama === nama);
-      if (!record && nama) {
-        record = records.find(r => r.nama === nama && r.waktuKembali === "-");
-      }
-      if (!record) {
-        return { success: false, message: "Sesi aktif tidak ditemukan di database." };
-      }
-      record.waktuKembali = time;
-      return { success: true, message: `Sesi ${nama} berhasil diselesaikan pada pukul ${time}.` };
-    }
-
-    case 'adminDeleteRecord': {
-      const { sessionId, nama } = payload;
-      const index = records.findIndex(r => 
-        (r.sessionId === sessionId && r.nama === nama) || 
-        (nama && r.nama === nama && r.waktuKembali === "-")
-      );
-      if (index === -1) {
-        return { success: false, message: "Sesi aktif tidak ditemukan atau sudah dihapus." };
-      }
-      records.splice(index, 1);
-      return { success: true, message: "Log berhasil dihapus dari database." };
-    }
-
-    default:
-      return { success: false, message: "Aksi tidak dikenal: " + action };
-  }
-}
-
-// Support both /api and root POST
-app.post(['/api', '/'], (req, res) => {
+// Support both /api and root POST - forwards to Google Apps Script / Google Sheets
+app.post(['/api', '/'], async (req, res) => {
   try {
     const payload = parseRequestBody(req);
-    const result = handleApiAction(payload);
+
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: typeof payload === 'string' ? payload : JSON.stringify(payload),
+      redirect: 'follow'
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        success: false,
+        message: `Google Apps Script returned status ${response.status}`,
+        details: errorText
+      });
+    }
+
+    const result = await response.json();
     res.json(result);
   } catch (err) {
-    console.error('API Error:', err);
-    res.status(500).json({ success: false, message: err.toString() });
+    console.error('API Proxy Error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal terhubung ke database spreadsheet: ' + err.message
+    });
   }
 });
 
 app.get('/api', (req, res) => {
-  res.json({ success: true, message: "SIKEMAS BPS Kalbar API is running" });
+  res.json({
+    success: true,
+    message: "SIKEMAS BPS Kalbar API is running",
+    targetDatabase: APPS_SCRIPT_URL ? "connected" : "not configured"
+  });
 });
 
 // PWA Service Worker with required headers
@@ -345,6 +107,11 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`SIKEMAS Server running on http://0.0.0.0:${PORT}`);
-});
+// Run server when started directly
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`SIKEMAS Server running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+export default app;

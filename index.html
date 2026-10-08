@@ -521,8 +521,9 @@
     </div>
 
     <script>
-        // Konfigurasi URL API Backend SIKEMAS
+        // Konfigurasi URL API Backend SIKEMAS (Vercel Serverless / Local Proxy)
         const SCRIPT_URL = "/api";
+        const FALLBACK_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVVl2X7Xjt3SE8G1-xgpofjKCYEfG7eMuRWFlKAP_cKz7fN7AffUy6_LVdscT1DwcdYw/exec";
         
         // State Manajemen Sesi Aktif
         let activeSession = {
@@ -792,14 +793,13 @@
                 });
             }
             
-            // 2. Jika dijalankan secara lokal/eksternal, lakukan fetch ke SCRIPT_URL
+            const payload = {
+                action: action,
+                ...data
+            };
+
+            // 2. Coba request ke API Backend (/api) terlebih dahulu (Vercel Serverless / Local Proxy)
             try {
-                const payload = {
-                    action: action,
-                    ...data
-                };
-                
-                // Menggunakan Content-Type: text/plain untuk menghindari CORS preflight OPTIONS request
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
                     headers: {
@@ -808,13 +808,31 @@
                     body: JSON.stringify(payload)
                 });
                 
+                if (response.ok) {
+                    return await response.json();
+                }
+                console.warn(`Endpoint ${SCRIPT_URL} mengembalikan status ${response.status}. Mencoba direct fallback ke Google Apps Script...`);
+            } catch (err) {
+                console.warn(`Koneksi ke ${SCRIPT_URL} gagal (${err.message}). Mencoba direct fallback ke Google Apps Script...`);
+            }
+
+            // 3. Fallback jika /api tidak tersedia (misal preview offline/statis), langsung ke Google Apps Script
+            try {
+                const response = await fetch(FALLBACK_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(`Apps Script direct HTTP status: ${response.status}`);
                 }
                 
                 return await response.json();
             } catch (error) {
-                console.error('Error calling Apps Script via fetch:', error);
+                console.error('Error calling Apps Script via direct fallback:', error);
                 throw error;
             }
         }
