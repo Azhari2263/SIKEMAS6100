@@ -449,13 +449,44 @@
                             </div>
 
                             <div class="space-y-3.5 lg:space-y-4">
+                                <!-- TIM KERJA DROPDOWN -->
                                 <div>
                                     <label class="block text-[11px] font-bold text-bpsBlue uppercase tracking-wider mb-1.5"><i
-                                            class="fa-solid fa-user mr-1"></i> Nama Pegawai</label>
-                                    <select id="nama"
+                                            class="fa-solid fa-people-group mr-1"></i> Tim Kerja</label>
+                                    <select id="tim_kerja" onchange="onTimKerjaChange()"
                                         class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-bpsBlue focus:ring-1 focus:ring-bpsBlue transition-all bg-white cursor-pointer">
-                                        <option value="" disabled selected>Memuat daftar nama...</option>
+                                        <option value="" disabled selected>Pilih Tim Kerja...</option>
                                     </select>
+                                </div>
+
+                                <!-- NAMA PEGAWAI SEARCHABLE DROPDOWN -->
+                                <div class="relative" id="nama-dropdown-container">
+                                    <label class="block text-[11px] font-bold text-bpsBlue uppercase tracking-wider mb-1.5"><i
+                                            class="fa-solid fa-user mr-1"></i> Nama Pegawai</label>
+                                    <input type="hidden" id="nama" value="">
+                                    <div class="relative">
+                                        <input type="text" id="nama-search-input" readonly
+                                            placeholder="Pilih Tim Kerja terlebih dahulu..."
+                                            onclick="toggleNamaDropdown()"
+                                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-bpsBlue focus:ring-1 focus:ring-bpsBlue transition-all bg-white cursor-pointer pr-10">
+                                        <div class="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-slate-400">
+                                            <i id="nama-dropdown-icon" class="fa-solid fa-chevron-down text-xs transition-transform duration-200"></i>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dropdown Panel -->
+                                    <div id="nama-dropdown-panel" class="hidden absolute z-30 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-60 flex flex-col transition-all">
+                                        <div class="p-2 border-b border-slate-100 bg-slate-50/80">
+                                            <div class="relative">
+                                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                                <input type="text" id="nama-filter-box" oninput="filterNamaOptions()" placeholder="Cari nama pegawai..."
+                                                    class="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-bpsBlue focus:ring-1 focus:ring-bpsBlue">
+                                            </div>
+                                        </div>
+                                        <div id="nama-options-list" class="overflow-y-auto max-h-44 divide-y divide-slate-50 text-xs">
+                                            <!-- Options list populated dynamically -->
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-3.5">
@@ -601,8 +632,7 @@
                         <div class="space-y-5 text-xs leading-relaxed text-slate-600">
                             <div>
                                 <h4 class="font-bold text-bpsBlue text-sm mb-1.5">1. Buat Rencana Kegiatan</h4>
-                                <p>Pilih Nama Anda dari daftar dropdown, tentukan tanggal keluar, dan isi keterangan keperluan
-                                    dengan jelas. Lalu klik tombol <b class="text-bpsOrange">Simpan Rencana Kegiatan</b>.</p>
+                                <p>Pilih <b class="text-bpsBlue">Tim Kerja</b> Anda terlebih dahulu, kemudian pilih <b class="text-bpsBlue">Nama Pegawai</b> dari daftar (dapat dicari dengan mengetik nama), tentukan tanggal keluar, dan isi keterangan keperluan dengan jelas. Lalu klik tombol <b class="text-bpsOrange">Simpan Rencana Kegiatan</b>.</p>
                             </div>
                             <div>
                                 <h4 class="font-bold text-bpsBlue text-sm mb-1.5">2. Presensi Jam Keluar (Keberangkatan)</h4>
@@ -916,21 +946,61 @@
 
         // ================= FUNGSI API CALL =================
         
-        // Daftar nama pegawai cadangan (Offline cache BPS Kalbar)
-        const DEFAULT_EMPLOYEE_LIST = [
-            "Achmad Firdaus", "Agus Tetriansyah", "Agustinus Supriadi, S.M.", "Ajeng Prana Wengrum Wardono, S.E.",
-            "Alfiana Ayuni, A.Md", "Amanda Putri, A.Md", "Anggi Septiawan, S.Tr.Stat.", "Any Pebruana, S.Si",
-            "Arpandi", "Azhari, S.Tr.Stat.", "Devi Mirtha Hapsari, S.E.", "Diah Nadiva Soetedjo, S.I.Kom.",
-            "Dody Iskandar, ST", "Eddy Suryadi", "Eko Prasetyo", "Endang Karyuni", "Feri Yusthami",
-            "Fitri Wahyu Yuliasih, SST, ME", "Gita Wahyuntari Listyandika, SST", "Ibrahim",
-            "Levi Alvaro Samosir, A.Md.Stat", "M. Yun Imran, SE", "Mawardi", "Muhammad Muzaky Ali Fikri, A.Md.Kom",
-            "Muhammad Syukri", "Nasip Budi Waluyo", "Nufi Alabshar, SST, M.Sc", "Nugra Liantin, S.ST",
-            "Nurdila Yulianti, S.Psi", "Nurramadhanial", "Pri Eka Fitri, S.Si.", "Puji Astuti, S.Stat.",
-            "Purnomo Hari Siswanto, S.Mn", "Ramadhan", "Rania Naila Husna, A.Md.A.B", "Reza Pahlevi Arifin, SE",
-            "Riska Miwanti, A.md", "Rizky Fadli", "Salsabila Muna Shobiha, A.Md.Stat.", "Slamet Riyadi",
-            "Sri Yuli Handayati, S.Ak", "Supardiyono", "Sutejo", "Syafa'atun, S.Si., M.E.",
-            "Syarif Naufal Handayani, S.Si.", "Syarif Reza Nopriadrian Al Kadri", "Syaroni, S.T.",
-            "Yanis Munandar, S.E.", "Yunita, SST, M.Ec.Dev", "Yuni Julmiati"
+        // ================= DATA USER & DROPDOWN (TIM KERJA + NAMA PEGAWAI) =================
+        let allUserData = [];
+        let currentFilteredEmployees = [];
+
+        const DEFAULT_USER_DATA = [
+            { nama: "Achmad Firdaus", timKerja: "Bagian Umum" },
+            { nama: "Agus Tetriansyah", timKerja: "Bagian Umum" },
+            { nama: "Agustinus Supriadi, S.M.", timKerja: "Bagian Umum" },
+            { nama: "Ajeng Prana Wengrum Wardono, S.E.", timKerja: "Bagian Umum" },
+            { nama: "Alfiana Ayuni, A.Md", timKerja: "Bagian Umum" },
+            { nama: "Amanda Putri, A.Md", timKerja: "Bagian Umum" },
+            { nama: "Anggi Septiawan, S.Tr.Stat.", timKerja: "Tim Stat. Sosial" },
+            { nama: "Any Pebruana, S.Si", timKerja: "Tim Stat. Sosial" },
+            { nama: "Arpandi", timKerja: "Bagian Umum" },
+            { nama: "Azhari, S.Tr.Stat.", timKerja: "Tim IPDS" },
+            { nama: "Devi Mirtha Hapsari, S.E.", timKerja: "Tim Stat. Nerwilis" },
+            { nama: "Diah Nadiva Soetedjo, S.I.Kom.", timKerja: "Bagian Umum" },
+            { nama: "Dody Iskandar, ST", timKerja: "Tim IPDS" },
+            { nama: "Eddy Suryadi", timKerja: "Bagian Umum" },
+            { nama: "Eko Prasetyo", timKerja: "Tim Stat. Produksi" },
+            { nama: "Endang Karyuni", timKerja: "Bagian Umum" },
+            { nama: "Feri Yusthami", timKerja: "Bagian Umum" },
+            { nama: "Fitri Wahyu Yuliasih, SST, ME", timKerja: "Tim Stat. Sosial" },
+            { nama: "Gita Wahyuntari Listyandika, SST", timKerja: "Tim Stat. Distribusi" },
+            { nama: "Ibrahim", timKerja: "Bagian Umum" },
+            { nama: "Levi Alvaro Samosir, A.Md.Stat", timKerja: "Tim Stat. Distribusi" },
+            { nama: "M. Yun Imran, SE", timKerja: "Tim Stat. Distribusi" },
+            { nama: "Mawardi", timKerja: "Bagian Umum" },
+            { nama: "Muhammad Muzaky Ali Fikri, A.Md.Kom", timKerja: "Tim IPDS" },
+            { nama: "Muhammad Syukri", timKerja: "Bagian Umum" },
+            { nama: "Nasip Budi Waluyo", timKerja: "Bagian Umum" },
+            { nama: "Nufi Alabshar, SST, M.Sc", timKerja: "Tim Stat. Nerwilis" },
+            { nama: "Nugra Liantin, S.ST", timKerja: "Tim Stat. Produksi" },
+            { nama: "Nurdila Yulianti, S.Psi", timKerja: "Bagian Umum" },
+            { nama: "Nurramadhanial", timKerja: "Bagian Umum" },
+            { nama: "Pri Eka Fitri, S.Si.", timKerja: "Tim Stat. Sosial" },
+            { nama: "Puji Astuti, S.Stat.", timKerja: "Tim Stat. Produksi" },
+            { nama: "Purnomo Hari Siswanto, S.Mn", timKerja: "Bagian Umum" },
+            { nama: "Ramadhan", timKerja: "Bagian Umum" },
+            { nama: "Rania Naila Husna, A.Md.A.B", timKerja: "Bagian Umum" },
+            { nama: "Reza Pahlevi Arifin, SE", timKerja: "Bagian Umum" },
+            { nama: "Riska Miwanti, A.md", timKerja: "Bagian Umum" },
+            { nama: "Rizky Fadli", timKerja: "Bagian Umum" },
+            { nama: "Salsabila Muna Shobiha, A.Md.Stat.", timKerja: "Tim Stat. Distribusi" },
+            { nama: "Slamet Riyadi", timKerja: "Bagian Umum" },
+            { nama: "Sri Yuli Handayati, S.Ak", timKerja: "Bagian Umum" },
+            { nama: "Supardiyono", timKerja: "Bagian Umum" },
+            { nama: "Sutejo", timKerja: "Bagian Umum" },
+            { nama: "Syafa'atun, S.Si., M.E.", timKerja: "Tim Stat. Nerwilis" },
+            { nama: "Syarif Naufal Handayani, S.Si.", timKerja: "Tim IPDS" },
+            { nama: "Syarif Reza Nopriadrian Al Kadri", timKerja: "Bagian Umum" },
+            { nama: "Syaroni, S.T.", timKerja: "Tim IPDS" },
+            { nama: "Yanis Munandar, S.E.", timKerja: "Bagian Umum" },
+            { nama: "Yunita, SST, M.Ec.Dev", timKerja: "Tim Stat. Sosial" },
+            { nama: "Yuni Julmiati", timKerja: "Bagian Umum" }
         ];
 
         // Fungsi untuk memanggil Google Apps Script dengan fetch atau google.script.run
@@ -1001,60 +1071,210 @@
             }
         }
 
-        // ================= FUNGSI UNTUK DROPDOWN =================
+        // ================= LOGIKA DROPDOWN CASCADING & SEARCHABLE =================
 
-        // Render daftar nama pegawai ke elemen <select id="nama">
-        function populateEmployeeSelect(names) {
-            const select = document.getElementById('nama');
-            if (!select || !Array.isArray(names) || names.length === 0) return;
+        function populateTimKerjaSelect(users) {
+            const timSelect = document.getElementById('tim_kerja');
+            if (!timSelect) return;
             
-            const currentValue = select.value;
-            select.innerHTML = '<option value="" disabled selected>Pilih nama Anda...</option>';
-            
-            names.forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                select.appendChild(option);
+            const teamsSet = new Set();
+            users.forEach(u => {
+                if (u && u.timKerja) teamsSet.add(u.timKerja);
             });
-
-            // Pulihkan pilihan jika ada sesi aktif atau pilihan sebelumnya
-            if (activeSession && activeSession.active && activeSession.nama) {
-                select.value = activeSession.nama;
-            } else if (currentValue && names.includes(currentValue)) {
-                select.value = currentValue;
+            
+            const sortedTeams = Array.from(teamsSet).sort();
+            const currentVal = timSelect.value;
+            
+            timSelect.innerHTML = '<option value="" disabled selected>Pilih Tim Kerja...</option>';
+            sortedTeams.forEach(team => {
+                const opt = document.createElement('option');
+                opt.value = team;
+                opt.textContent = team;
+                timSelect.appendChild(opt);
+            });
+            
+            if (currentVal && sortedTeams.includes(currentVal)) {
+                timSelect.value = currentVal;
             }
         }
+
+        function onTimKerjaChange() {
+            const timSelect = document.getElementById('tim_kerja');
+            const selectedTeam = timSelect ? timSelect.value : "";
+            const searchInput = document.getElementById('nama-search-input');
+            const namaHidden = document.getElementById('nama');
+            
+            if (!selectedTeam) {
+                currentFilteredEmployees = [];
+                if (searchInput) {
+                    searchInput.value = "";
+                    searchInput.placeholder = "Pilih Tim Kerja terlebih dahulu...";
+                }
+                if (namaHidden) namaHidden.value = "";
+                closeNamaDropdown();
+                return;
+            }
+            
+            currentFilteredEmployees = allUserData.filter(u => u.timKerja === selectedTeam);
+            
+            if (searchInput) {
+                searchInput.placeholder = "Klik untuk memilih / cari nama pegawai...";
+            }
+            
+            const currentName = namaHidden ? namaHidden.value : "";
+            if (currentName) {
+                const stillValid = currentFilteredEmployees.some(e => e.nama === currentName);
+                if (!stillValid) {
+                    if (namaHidden) namaHidden.value = "";
+                    if (searchInput) searchInput.value = "";
+                }
+            }
+            
+            renderNamaOptions();
+        }
+
+        function toggleNamaDropdown() {
+            const timSelect = document.getElementById('tim_kerja');
+            if (!timSelect || !timSelect.value) {
+                showCustomAlert("Pilih Tim Kerja", "Silakan pilih Tim Kerja terlebih dahulu sebelum memilih Nama Pegawai.", "warning");
+                return;
+            }
+            
+            const panel = document.getElementById('nama-dropdown-panel');
+            const icon = document.getElementById('nama-dropdown-icon');
+            if (!panel) return;
+            
+            const isHidden = panel.classList.contains('hidden');
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                if (icon) icon.classList.add('rotate-180');
+                const filterBox = document.getElementById('nama-filter-box');
+                if (filterBox) {
+                    filterBox.value = "";
+                    renderNamaOptions();
+                    setTimeout(() => filterBox.focus(), 50);
+                }
+            } else {
+                closeNamaDropdown();
+            }
+        }
+
+        function closeNamaDropdown() {
+            const panel = document.getElementById('nama-dropdown-panel');
+            const icon = document.getElementById('nama-dropdown-icon');
+            if (panel) panel.classList.add('hidden');
+            if (icon) icon.classList.remove('rotate-180');
+        }
+
+        function renderNamaOptions(keyword = "") {
+            const optionsList = document.getElementById('nama-options-list');
+            if (!optionsList) return;
+            
+            const searchKey = keyword.trim().toLowerCase();
+            const filtered = currentFilteredEmployees.filter(e => 
+                e.nama.toLowerCase().includes(searchKey)
+            );
+            
+            if (filtered.length === 0) {
+                optionsList.innerHTML = `
+                    <div class="px-4 py-3 text-slate-400 text-center italic text-xs">
+                        Tidak ada nama pegawai yang cocok
+                    </div>
+                `;
+                return;
+            }
+            
+            const currentVal = document.getElementById('nama') ? document.getElementById('nama').value : "";
+            
+            optionsList.innerHTML = filtered.map(e => {
+                const isSelected = e.nama === currentVal;
+                const safeName = e.nama.replace(/'/g, "\\'");
+                return `
+                    <div onclick="selectNamaOption('${safeName}')"
+                        class="px-4 py-2.5 hover:bg-bpsBlue/10 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-bpsBlue/10 text-bpsBlue font-bold' : 'text-slate-700'}">
+                        <span>${e.nama}</span>
+                        ${isSelected ? '<i class="fa-solid fa-check text-bpsBlue text-xs"></i>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterNamaOptions() {
+            const filterBox = document.getElementById('nama-filter-box');
+            const keyword = filterBox ? filterBox.value : "";
+            renderNamaOptions(keyword);
+        }
+
+        function selectNamaOption(name) {
+            const namaHidden = document.getElementById('nama');
+            const searchInput = document.getElementById('nama-search-input');
+            
+            if (namaHidden) namaHidden.value = name;
+            if (searchInput) searchInput.value = name;
+            
+            closeNamaDropdown();
+        }
+
+        // Tutup dropdown saat klik di luar area komponen
+        document.addEventListener('click', function(e) {
+            const container = document.getElementById('nama-dropdown-container');
+            if (container && !container.contains(e.target)) {
+                closeNamaDropdown();
+            }
+        });
         
         async function loadEmployeeDropdown() {
-            // 1. Langsung inisialisasi dropdown dari cache LocalStorage atau default offline agar dropdown siap seketika
-            let cachedNames = null;
+            let cachedUsers = null;
             try {
-                const stored = localStorage.getItem('sikemas_employee_list');
-                if (stored) cachedNames = JSON.parse(stored);
+                const stored = localStorage.getItem('sikemas_user_data');
+                if (stored) cachedUsers = JSON.parse(stored);
             } catch (e) {}
 
-            const initialNames = (cachedNames && Array.isArray(cachedNames) && cachedNames.length > 0)
-                ? cachedNames
-                : DEFAULT_EMPLOYEE_LIST;
+            if (cachedUsers && Array.isArray(cachedUsers) && cachedUsers.length > 0) {
+                allUserData = cachedUsers;
+            } else {
+                allUserData = DEFAULT_USER_DATA;
+            }
 
-            populateEmployeeSelect(initialNames);
+            populateTimKerjaSelect(allUserData);
+            restoreUserSelections();
 
-            // 2. Sinkronkan nama pegawai terbaru dari spreadsheet Google Sheets di latar belakang
             try {
                 const result = await callAppsScript('getEmployeeNames');
                 if (result && result.success && Array.isArray(result.data) && result.data.length > 0) {
-                    populateEmployeeSelect(result.data);
+                    let fetchedUsers = result.data.map(item => {
+                        if (typeof item === 'string') {
+                            return { nama: item, timKerja: "Lainnya" };
+                        }
+                        return { nama: item.nama, timKerja: item.timKerja || "Lainnya" };
+                    });
+                    
+                    allUserData = fetchedUsers;
+                    populateTimKerjaSelect(allUserData);
                     try {
-                        localStorage.setItem('sikemas_employee_list', JSON.stringify(result.data));
+                        localStorage.setItem('sikemas_user_data', JSON.stringify(allUserData));
                     } catch (e) {}
+                    
+                    restoreUserSelections();
                 }
             } catch (error) {
                 console.warn('Gagal sinkronisasi nama pegawai terbaru dari server, menggunakan data cadangan:', error);
-                // Pastikan dropdown tetap terisi jika sebelumnya kosong
-                const select = document.getElementById('nama');
-                if (!select || select.options.length <= 1) {
-                    populateEmployeeSelect(DEFAULT_EMPLOYEE_LIST);
+            }
+        }
+
+        function restoreUserSelections() {
+            let targetName = "";
+            if (activeSession && activeSession.active && activeSession.nama) {
+                targetName = activeSession.nama;
+            }
+            
+            if (targetName) {
+                const found = allUserData.find(u => u.nama === targetName);
+                if (found) {
+                    const timSelect = document.getElementById('tim_kerja');
+                    if (timSelect) timSelect.value = found.timKerja;
+                    onTimKerjaChange();
+                    selectNamaOption(targetName);
                 }
             }
         }
@@ -1362,7 +1582,17 @@
             document.getElementById('keterangan').value = "";
 
             // Atur ulang dropdown ke opsi default
-            document.getElementById('nama').value = "";
+            const timSelect = document.getElementById('tim_kerja');
+            if (timSelect) timSelect.value = "";
+            const searchInput = document.getElementById('nama-search-input');
+            if (searchInput) {
+                searchInput.value = "";
+                searchInput.placeholder = "Pilih Tim Kerja terlebih dahulu...";
+            }
+            const namaHidden = document.getElementById('nama');
+            if (namaHidden) namaHidden.value = "";
+            currentFilteredEmployees = [];
+            closeNamaDropdown();
 
             renderActiveSession();
             initDate();

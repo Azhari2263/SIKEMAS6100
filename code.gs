@@ -51,7 +51,7 @@ function getSheet() {
 }
 
 /**
- * Mengambil daftar nama pegawai dari sheet "User" kolom A secara dinamis
+ * Mengambil daftar nama pegawai dan tim kerja dari sheet "User" (Kolom A: Nama, Kolom B: Tim Kerja)
  */
 function getEmployeeNames() {
   try {
@@ -68,32 +68,39 @@ function getEmployeeNames() {
       }
     }
     
-    if (!doc) return { success: true, data: [] };
+    if (!doc) return { success: true, data: [], names: [] };
 
     let sheet = doc.getSheetByName("User");
     if (!sheet) {
       sheet = doc.insertSheet("User");
-      sheet.appendRow(["Nama"]);
-      sheet.appendRow(["Azhari"]);
-      sheet.appendRow(["Budi Santoso"]);
-      sheet.appendRow(["Dewi Lestari"]);
-      sheet.getRange("A1").setFontWeight("bold").setBackground("#e2e8f0");
+      sheet.appendRow(["Nama", "Tim Kerja"]);
+      sheet.appendRow(["Azhari", "Tim IPDS"]);
+      sheet.appendRow(["Budi Santoso", "Tim Stat. Distribusi"]);
+      sheet.appendRow(["Dewi Lestari", "Tim Stat. Sosial"]);
+      sheet.getRange("A1:B1").setFontWeight("bold").setBackground("#e2e8f0");
     }
 
     const lastRow = sheet.getLastRow();
-    if (lastRow <= 1) return { success: true, data: [] };
+    if (lastRow <= 1) return { success: true, data: [], names: [] };
 
-    const range = sheet.getRange(2, 1, lastRow - 1, 1);
+    const maxCols = Math.max(sheet.getLastColumn(), 2);
+    const range = sheet.getRange(2, 1, lastRow - 1, maxCols);
     const values = range.getValues();
 
-    const names = values
-      .map(row => String(row[0]).trim())
-      .filter(name => name.length > 0);
+    const users = values
+      .map(row => {
+        const nama = String(row[0] || "").trim();
+        const timKerja = String(row[1] || "").trim() || "Lainnya";
+        return { nama: nama, timKerja: timKerja };
+      })
+      .filter(item => item.nama.length > 0);
+
+    const names = users.map(u => u.nama);
       
-    return { success: true, data: names };
+    return { success: true, data: users, names: names };
   } catch (error) {
     Logger.log("Error getEmployeeNames: " + error.toString());
-    return { success: false, message: error.toString(), data: [] };
+    return { success: false, message: error.toString(), data: [], names: [] };
   }
 }
 
